@@ -347,4 +347,13 @@ secrets.json
 # Temporary files
 *.tmp
 *.temp
-*~ 
+*~
+
+# Large media files (use Git LFS or external hosting for these)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wmv
+*.flv
+*.webm 
