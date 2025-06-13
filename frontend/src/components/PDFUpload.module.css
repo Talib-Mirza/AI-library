@@ -1,0 +1,95 @@
+.container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.uploadSection {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    align-items: center;
+}
+
+.fileInput {
+    flex: 1;
+    padding: 0.5rem;
+    border: 2px dashed #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.uploadButton {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.uploadButton:hover {
+    background-color: #0056b3;
+}
+
+.uploadButton:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.error {
+    color: #dc3545;
+    margin: 1rem 0;
+    padding: 0.5rem;
+    border: 1px solid #dc3545;
+    border-radius: 4px;
+    background-color: #f8d7da;
+}
+
+.results {
+    margin-top: 2rem;
+}
+
+.metadata {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 2rem;
+}
+
+.metadata p {
+    margin: 0.5rem 0;
+}
+
+.imagesSection {
+    margin-top: 2rem;
+}
+
+.imageGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.imageContainer {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.image {
+    width: 100%;
+    height: 200px;
+    object-fit: contain;
+    background-color: #f8f9fa;
+}
+
+.imageInfo {
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    font-size: 0.875rem;
+    text-align: center;
+    border-top: 1px solid #dee2e6;
+} 

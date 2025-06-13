@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+      - ./vector_db:/app/vector_db
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_library
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    command: npm run dev
+    depends_on:
+      - backend
+
+  # Celery Worker for background tasks
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+      - ./vector_db:/app/vector_db
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_library
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - backend
+      - redis
+    command: celery -A app.worker.celery worker --loglevel=info
+
+  # PostgreSQL Database
+  db:
+    image: postgres:14
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ai_library
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis for caching and Celery broker
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data: 
