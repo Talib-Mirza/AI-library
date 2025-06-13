@@ -91,6 +91,7 @@ class BookResponse(BaseModel):
     title: str
     author: Optional[str] = None
     description: Optional[str] = None
+    pdf_id: str
     file_path: str
     file_type: FileType
     file_size: int

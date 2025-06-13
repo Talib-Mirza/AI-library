@@ -25,6 +25,7 @@ class Book(Base):
     description = Column(Text, nullable=True)
     
     # File information
+    pdf_id = Column(String(36), nullable=False, unique=True, index=True)  # UUID for organized storage
     file_path = Column(String(255), nullable=False)
     file_type = Column(SQLAEnum(FileType), nullable=False)
     file_size = Column(Integer, nullable=False)  # Size in bytes

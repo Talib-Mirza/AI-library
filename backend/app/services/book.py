@@ -1,6 +1,7 @@
 import os
 from typing import List, Optional, Tuple, Any, Dict
 import shutil
+from datetime import datetime
 
 from fastapi import UploadFile, HTTPException
 from sqlalchemy import select, func
@@ -13,6 +14,7 @@ from app.schemas.book import BookCreate, BookUpdate, BookmarkCreate, HighlightCr
 from app.services.book_processor import BookProcessor
 from app.core.config import settings
 from app.services.pdf_processor import PDFProcessor
+from app.services.file_manager import FileManager
 
 
 class BookService:
@@ -28,6 +30,7 @@ class BookService:
         self.db = db
         self.processor = BookProcessor()
         self.pdf_processor = PDFProcessor()
+        self.file_manager = FileManager()
     
     async def create_book(
         self,
@@ -54,14 +57,23 @@ class BookService:
         """
         session = self.db
         
-        # Save file to disk
-        file_path = await self.processor.save_upload_file(file, file_content)
+        # Generate unique PDF ID
+        pdf_id = self.file_manager.generate_pdf_id()
         
-        # Create book object
+        # Save file using new organized structure
+        file_path = await self.file_manager.save_uploaded_file(
+            user_id=user_id,
+            pdf_id=pdf_id,
+            file=file,
+            file_content=file_content
+        )
+        
+        # Create book object with pdf_id
         book = Book(
             title=book_in.title,
             author=book_in.author,
             description=book_in.description,
+            pdf_id=pdf_id,
             file_path=file_path,
             file_type=file_type,
             file_size=file_size,
@@ -253,16 +265,15 @@ class BookService:
                 print(f"User {user_id} not authorized to delete book {book_id}")
                 raise HTTPException(status_code=403, detail="Not authorized to delete this book")
             
-            # Delete the physical file
-            if book.file_path and os.path.exists(book.file_path):
-                try:
-                    print(f"Deleting file: {book.file_path}")
-                    os.remove(book.file_path)
-                except Exception as e:
-                    print(f"Error deleting file {book.file_path}: {str(e)}")
-                    # Continue with database deletion even if file deletion fails
-            else:
-                print(f"File not found at path: {book.file_path}")
+            # Delete the entire PDF directory with all its contents
+            try:
+                print(f"Deleting PDF directory for user {user_id}, pdf_id {book.pdf_id}")
+                success = self.file_manager.delete_pdf_directory(user_id, book.pdf_id)
+                if not success:
+                    print(f"Warning: Could not delete PDF directory for book {book_id}")
+            except Exception as e:
+                print(f"Error deleting PDF directory: {str(e)}")
+                # Continue with database deletion even if file deletion fails
             
             # Delete the book from database
             print(f"Deleting book {book_id} from database")
@@ -373,7 +384,7 @@ class BookService:
     
     async def get_book_content(self, book_id: int, user_id: int) -> Dict:
         """
-        Get processed content of a book.
+        Get processed content of a book, using cached content if available.
         
         Args:
             book_id: Book ID
@@ -393,22 +404,41 @@ class BookService:
             print(f"Book {book_id} not found")
             raise HTTPException(status_code=404, detail="Book not found")
         
-        print(f"Book found: {book.title}, user_id: {book.user_id}")
+        print(f"Book found: {book.title}, user_id: {book.user_id}, pdf_id: {book.pdf_id}")
         
         if book.user_id != user_id:
             print(f"User {user_id} not authorized to access book {book_id}")
             raise HTTPException(status_code=403, detail="Not authorized to access this book")
-        
-        if not book.file_path or not os.path.exists(book.file_path):
-            print(f"File not found at path: {book.file_path}")
-            raise HTTPException(status_code=404, detail="Book file not found")
         
         if book.file_type != FileType.PDF:
             print(f"Invalid file type: {book.file_type}")
             raise HTTPException(status_code=400, detail="File is not a PDF")
         
         try:
-            print(f"Processing PDF file: {book.file_path}")
+            # Check if processed content exists in cache
+            cached_content = self.file_manager.load_processed_content(user_id, book.pdf_id)
+            
+            if cached_content:
+                print(f"Found cached content for book {book_id}")
+                
+                # Update book status if needed
+                if not book.is_processed:
+                    book.is_processed = True
+                    book.processing_error = None
+                    book.page_count = cached_content.get("total_pages", 0)
+                    book.text_content = cached_content.get("text_content", "")
+                    await self.db.commit()
+                
+                return cached_content
+            
+            # No cached content - need to process PDF
+            print(f"No cached content found, processing PDF file: {book.file_path}")
+            
+            # Verify file exists
+            if not book.file_path or not os.path.exists(book.file_path):
+                print(f"File not found at path: {book.file_path}")
+                raise HTTPException(status_code=404, detail="Book file not found")
+            
             # Process the PDF and get structured content
             content = self.pdf_processor.process_pdf(book.file_path)
             
@@ -417,7 +447,22 @@ class BookService:
             
             print(f"Successfully processed PDF with {len(content.get('pages', []))} pages")
             
-            # Update book if not processed
+            # Cache the processed content
+            self.file_manager.save_processed_content(user_id, book.pdf_id, content)
+            print(f"Cached processed content for book {book_id}")
+            
+            # Save metadata separately
+            metadata = {
+                "title": book.title,
+                "author": book.author,
+                "total_pages": content.get("total_pages", 0),
+                "file_size": book.file_size,
+                "processed_at": str(datetime.utcnow()),
+                "file_type": book.file_type.value
+            }
+            self.file_manager.save_metadata(user_id, book.pdf_id, metadata)
+            
+            # Update book status
             if not book.is_processed:
                 book.is_processed = True
                 book.processing_error = None
@@ -426,6 +471,7 @@ class BookService:
                 await self.db.commit()
             
             return content
+            
         except Exception as e:
             print(f"Error processing PDF: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}") 
