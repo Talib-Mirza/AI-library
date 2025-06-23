@@ -313,4 +313,58 @@ class FileManager:
         if not safe_filename.lower().endswith('.pdf'):
             safe_filename += '.pdf'
         
-        return safe_filename 
+        return safe_filename
+    
+    def save_cover_image(self, user_id: int, book_id: str, cover_image_content: bytes, filename: str) -> str:
+        """
+        Save cover image to the book directory.
+        
+        Args:
+            user_id: User ID
+            book_id: Book ID (used as directory name)
+            cover_image_content: Image file content
+            filename: Original filename
+            
+        Returns:
+            Path to saved cover image file
+        """
+        book_dir = self.get_pdf_directory(user_id, book_id)
+        
+        # Clean filename and ensure it's an image
+        safe_filename = self._sanitize_filename(filename)
+        
+        # Ensure it has an image extension
+        if not any(safe_filename.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
+            # Add .jpg extension if no valid image extension
+            safe_filename = safe_filename.rsplit('.', 1)[0] + '.jpg'
+        
+        # Save with a standard name for consistency
+        cover_filename = f"cover{os.path.splitext(safe_filename)[1]}"
+        cover_path = book_dir / cover_filename
+        
+        with open(cover_path, "wb") as f:
+            f.write(cover_image_content)
+        
+        return str(cover_path)
+    
+    def get_cover_image_url(self, user_id: int, book_id: str) -> Optional[str]:
+        """
+        Get the URL for a book's cover image if it exists.
+        
+        Args:
+            user_id: User ID
+            book_id: Book ID
+            
+        Returns:
+            Cover image URL or None if not found
+        """
+        book_dir = self.get_pdf_directory(user_id, book_id)
+        
+        # Look for cover image files
+        for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            cover_path = book_dir / f"cover{ext}"
+            if cover_path.exists():
+                # Return URL relative to uploads directory
+                return f"/uploads/{user_id}/{book_id}/cover{ext}"
+        
+        return None 

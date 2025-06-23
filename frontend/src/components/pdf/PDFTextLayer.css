@@ -1,0 +1,67 @@
+/* PDF.js Text Layer Styles for Text Selection */
+.textLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  opacity: 0; /* Hidden but still selectable */
+  line-height: 1.0;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+.textLayer > span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* Hover highlighting for text chunks */
+.textLayer .hover-highlight {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3);
+  transition: background-color 0.15s ease-in-out;
+}
+
+.textLayer .highlight {
+  margin: -1px;
+  padding: 1px;
+  background-color: rgba(180, 0, 255, 0.2);
+  border-radius: 4px;
+}
+
+.textLayer .highlight.begin {
+  border-radius: 4px 0px 0px 4px;
+}
+
+.textLayer .highlight.end {
+  border-radius: 0px 4px 4px 0px;
+}
+
+.textLayer .highlight.middle {
+  border-radius: 0px;
+}
+
+.textLayer .highlight.selected {
+  background-color: rgba(0, 100, 255, 0.2);
+}
+
+/* Text selection highlighting */
+.textLayer span::selection {
+  background: rgba(0, 100, 255, 0.3);
+}
+
+.textLayer span::-moz-selection {
+  background: rgba(0, 100, 255, 0.3);
+} 

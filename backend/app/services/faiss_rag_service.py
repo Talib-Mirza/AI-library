@@ -58,17 +58,13 @@ class FAISSRAGService:
                 max_tokens=1000
             )
             
-            # Initialize text splitter
+            # Configure text splitter
             self.text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=1000,
                 chunk_overlap=200,
                 length_function=len,
                 separators=["\n\n", "\n", ". ", " ", ""]
             )
-            
-            # Ensure FAISS directory exists
-            faiss_path = Path(settings.VECTOR_DB_PATH)
-            faiss_path.mkdir(exist_ok=True)
             
             self.initialized = True
             logger.info("FAISS RAG service initialized successfully")
@@ -81,14 +77,30 @@ class FAISSRAGService:
     
     def _get_vector_store_path(self, document_id: str) -> Path:
         """Get the file path for a document's vector store"""
+        # Check if this is a book embedding (format: user_{user_id}_book_{book_id})
+        if "_book_" in document_id and document_id.startswith("user_"):
+            # Extract user_id and book_id from document_id
+            # Format: user_{user_id}_book_{book_id}
+            parts = document_id.split("_")
+            if len(parts) >= 4 and parts[0] == "user" and parts[2] == "book":
+                user_id = parts[1]
+                book_id = parts[3]
+                
+                # Store embeddings directly in the book_id directory alongside content.json and metadata.json
+                # This creates: uploads/{user_id}/{book_id}/embeddings/
+                return Path(settings.UPLOAD_DIR) / user_id / book_id / "embeddings"
+        
+        # For non-book documents, use the old vector_db directory
         return Path(settings.VECTOR_DB_PATH) / f"faiss_{document_id}"
     
     def _save_vector_store(self, vector_store: FAISS, document_id: str) -> None:
         """Save a vector store to disk"""
         try:
             store_path = self._get_vector_store_path(document_id)
+            # Ensure the directory exists
+            store_path.mkdir(parents=True, exist_ok=True)
             vector_store.save_local(str(store_path))
-            logger.info(f"Saved vector store for document {document_id}")
+            logger.info(f"Saved vector store for document {document_id} to {store_path}")
         except Exception as e:
             logger.error(f"Failed to save vector store for document {document_id}: {str(e)}")
     
@@ -436,16 +448,47 @@ Answer:"""
             List of document IDs
         """
         try:
-            vector_db_path = Path(settings.VECTOR_DB_PATH)
-            if not vector_db_path.exists():
-                return []
-                
             document_ids = []
-            for item in vector_db_path.iterdir():
-                if item.is_dir() and item.name.startswith("faiss_"):
-                    doc_id = item.name[6:]  # Remove "faiss_" prefix
-                    document_ids.append(doc_id)
+            
+            # Check old vector_db directory for non-book documents
+            vector_db_path = Path(settings.VECTOR_DB_PATH)
+            if vector_db_path.exists():
+                for item in vector_db_path.iterdir():
+                    if item.is_dir() and item.name.startswith("faiss_"):
+                        doc_id = item.name[6:]  # Remove "faiss_" prefix
+                        document_ids.append(doc_id)
+            
+            # Check uploads directory for book embeddings using book_id structure
+            uploads_path = Path(settings.UPLOAD_DIR)
+            if uploads_path.exists():
+                try:
+                    from app.models.book import Book
+                    from app.core.database import SessionLocal
                     
+                    with SessionLocal() as db:
+                        # Get all books to check their book_id directories
+                        books = db.query(Book).all()
+                        for book in books:
+                            embeddings_path = uploads_path / str(book.user_id) / str(book.id) / "embeddings"
+                            if embeddings_path.exists() and (embeddings_path / "index.faiss").exists():
+                                # Reconstruct the document_id format
+                                doc_id = f"user_{book.user_id}_book_{book.id}"
+                                document_ids.append(doc_id)
+                except Exception as e:
+                    logger.error(f"Error checking book embeddings: {str(e)}")
+                    # Fallback: manually check directory structure
+                    for user_dir in uploads_path.iterdir():
+                        if user_dir.is_dir() and user_dir.name.isdigit():  # user_id directories
+                            for book_dir in user_dir.iterdir():
+                                if book_dir.is_dir() and book_dir.name.isdigit():  # book_id directories
+                                    embeddings_path = book_dir / "embeddings"
+                                    if embeddings_path.exists() and (embeddings_path / "index.faiss").exists():
+                                        # Reconstruct document_id from directory structure
+                                        user_id = user_dir.name
+                                        book_id = book_dir.name
+                                        doc_id = f"user_{user_id}_book_{book_id}"
+                                        document_ids.append(doc_id)
+            
             return document_ids
             
         except Exception as e:

@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import List, Optional, Tuple, Any, Dict
 import shutil
@@ -11,7 +12,6 @@ from sqlalchemy.orm import selectinload
 from app.db.session import get_db, async_session_factory
 from app.models.book import Book, Bookmark, Highlight, Annotation, FileType
 from app.schemas.book import BookCreate, BookUpdate, BookmarkCreate, HighlightCreate, AnnotationCreate
-from app.services.book_processor import BookProcessor
 from app.core.config import settings
 from app.services.pdf_processor import PDFProcessor
 from app.services.file_manager import FileManager
@@ -28,7 +28,6 @@ class BookService:
             db: Optional database session.
         """
         self.db = db
-        self.processor = BookProcessor()
         self.pdf_processor = PDFProcessor()
         self.file_manager = FileManager()
     
@@ -40,6 +39,8 @@ class BookService:
         file_type: FileType,
         file_size: int,
         user_id: int,
+        cover_image: Optional[UploadFile] = None,
+        cover_image_content: Optional[bytes] = None,
     ) -> Book:
         """
         Create a new book.
@@ -51,6 +52,8 @@ class BookService:
             file_type: File type
             file_size: File size in bytes
             user_id: User ID
+            cover_image: Optional cover image file
+            cover_image_content: Optional cover image content
             
         Returns:
             Created book object
@@ -60,29 +63,56 @@ class BookService:
         # Generate unique PDF ID
         pdf_id = self.file_manager.generate_pdf_id()
         
-        # Save file using new organized structure
-        file_path = await self.file_manager.save_uploaded_file(
-            user_id=user_id,
-            pdf_id=pdf_id,
-            file=file,
-            file_content=file_content
-        )
+        # Save file using book_id for directory structure (will be created after book is saved)
+        # We'll move the file after the book is created and we have the book_id
         
-        # Create book object with pdf_id
+        # Create book object first
         book = Book(
             title=book_in.title,
             author=book_in.author,
             description=book_in.description,
-            pdf_id=pdf_id,
-            file_path=file_path,
+            pdf_id=pdf_id,  # Keep pdf_id for backward compatibility but use book_id for directories
+            file_path="",  # Will be set after file is saved
             file_type=file_type,
             file_size=file_size,
             is_processed=False,
             user_id=user_id,
         )
         
-        # Add and commit
+        # Add and commit to get the book_id
         session.add(book)
+        await session.commit()
+        await session.refresh(book)
+        
+        # Now save file using book_id for directory structure
+        file_path = await self.file_manager.save_uploaded_file(
+            user_id=user_id,
+            pdf_id=str(book.id),  # Use book_id as directory name
+            file=file,
+            file_content=file_content
+        )
+        
+        # Update book with file path
+        book.file_path = file_path
+        
+        # Handle cover image if provided
+        cover_image_url = None
+        if cover_image and cover_image_content:
+            try:
+                cover_path = self.file_manager.save_cover_image(
+                    user_id=user_id,
+                    book_id=str(book.id),
+                    cover_image_content=cover_image_content,
+                    filename=cover_image.filename or "cover.jpg"
+                )
+                # Generate URL for the cover image
+                cover_image_url = f"/uploads/{user_id}/{book.id}/cover{os.path.splitext(cover_path)[1]}"
+                book.cover_image_url = cover_image_url
+                print(f"Saved cover image for book {book.id}: {cover_image_url}")
+            except Exception as e:
+                print(f"Warning: Could not save cover image for book {book.id}: {str(e)}")
+                # Continue without cover image
+        
         await session.commit()
         await session.refresh(book)
         
@@ -265,15 +295,25 @@ class BookService:
                 print(f"User {user_id} not authorized to delete book {book_id}")
                 raise HTTPException(status_code=403, detail="Not authorized to delete this book")
             
-            # Delete the entire PDF directory with all its contents
+            # Delete the entire book directory with all its contents (using book_id)
             try:
-                print(f"Deleting PDF directory for user {user_id}, pdf_id {book.pdf_id}")
-                success = self.file_manager.delete_pdf_directory(user_id, book.pdf_id)
+                print(f"Deleting book directory for user {user_id}, book_id {book_id}")
+                success = self.file_manager.delete_pdf_directory(user_id, str(book_id))
                 if not success:
-                    print(f"Warning: Could not delete PDF directory for book {book_id}")
+                    print(f"Warning: Could not delete book directory for book {book_id}")
             except Exception as e:
-                print(f"Error deleting PDF directory: {str(e)}")
+                print(f"Error deleting book directory: {str(e)}")
                 # Continue with database deletion even if file deletion fails
+            
+            # Delete embeddings from FAISS service
+            try:
+                from app.services.faiss_rag_service import faiss_rag_service
+                document_id = f"user_{user_id}_book_{book_id}"
+                print(f"Deleting embeddings for document_id: {document_id}")
+                faiss_rag_service.delete_document_embeddings(document_id)
+            except Exception as e:
+                print(f"Warning: Could not delete embeddings for book {book_id}: {str(e)}")
+                # Continue with database deletion even if embeddings deletion fails
             
             # Delete the book from database
             print(f"Deleting book {book_id} from database")
@@ -415,8 +455,8 @@ class BookService:
             raise HTTPException(status_code=400, detail="File is not a PDF")
         
         try:
-            # Check if processed content exists in cache
-            cached_content = self.file_manager.load_processed_content(user_id, book.pdf_id)
+            # Check if processed content exists in cache (using book_id for directory)
+            cached_content = self.file_manager.load_processed_content(user_id, str(book_id))
             
             if cached_content:
                 print(f"Found cached content for book {book_id}")
@@ -447,11 +487,11 @@ class BookService:
             
             print(f"Successfully processed PDF with {len(content.get('pages', []))} pages")
             
-            # Cache the processed content
-            self.file_manager.save_processed_content(user_id, book.pdf_id, content)
+            # Cache the processed content (using book_id for directory)
+            self.file_manager.save_processed_content(user_id, str(book_id), content)
             print(f"Cached processed content for book {book_id}")
             
-            # Save metadata separately
+            # Save metadata separately (using book_id for directory)
             metadata = {
                 "title": book.title,
                 "author": book.author,
@@ -460,7 +500,7 @@ class BookService:
                 "processed_at": str(datetime.utcnow()),
                 "file_type": book.file_type.value
             }
-            self.file_manager.save_metadata(user_id, book.pdf_id, metadata)
+            self.file_manager.save_metadata(user_id, str(book_id), metadata)
             
             # Update book status
             if not book.is_processed:

@@ -29,6 +29,7 @@ class Book(Base):
     file_path = Column(String(255), nullable=False)
     file_type = Column(SQLAEnum(FileType), nullable=False)
     file_size = Column(Integer, nullable=False)  # Size in bytes
+    cover_image_url = Column(String(255), nullable=True)  # Path to cover image file
     
     # Document processing status
     is_processed = Column(Boolean, default=False, nullable=False)

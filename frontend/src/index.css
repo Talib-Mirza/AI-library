@@ -274,3 +274,125 @@ img[loading="lazy"].loaded {
   opacity: 1;
 }
 
+/* PDF Virtualized List Styles */
+.pdf-virtualized-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.pdf-virtualized-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pdf-virtualized-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pdf-virtualized-list::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.pdf-virtualized-list::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.8);
+}
+
+/* Smooth scrolling for PDF pages */
+.pdf-virtualized-list .virtualized-pdf-page {
+  transition: transform 0.2s ease-out;
+}
+
+/* Performance optimizations */
+.pdf-virtualized-list * {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Loading shimmer effect */
+@keyframes shimmer {
+  0% { background-position: -468px 0; }
+  100% { background-position: 468px 0; }
+}
+
+.shimmer {
+  background: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
+  background-size: 800px 104px;
+  animation: shimmer 1.5s linear infinite;
+}
+
+/* PDF page improvements */
+.pdf-page-container {
+  contain: layout style paint;
+  will-change: transform;
+}
+
+.pdf-page-container canvas {
+  will-change: contents;
+}
+
+/* Hide text selection cursor when not needed */
+.pdf-page-text-layer {
+  cursor: text;
+}
+
+.pdf-page-text-layer:empty {
+  cursor: default;
+}
+
+/* PDF.js Text Layer Styles for Text Selection */
+.textLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  opacity: 0.2; /* Slightly visible for debugging, can be set to 0 for production */
+  line-height: 1.0;
+}
+
+.textLayer > span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer .highlight {
+  margin: -1px;
+  padding: 1px;
+  background-color: rgba(180, 0, 255, 0.2);
+  border-radius: 4px;
+}
+
+.textLayer .highlight.begin {
+  border-radius: 4px 0px 0px 4px;
+}
+
+.textLayer .highlight.end {
+  border-radius: 0px 4px 4px 0px;
+}
+
+.textLayer .highlight.middle {
+  border-radius: 0px;
+}
+
+.textLayer .highlight.selected {
+  background-color: rgba(0, 100, 255, 0.2);
+}
+
+/* Enable text selection */
+.textLayer span::selection {
+  background: rgba(0, 100, 255, 0.3);
+}
+
+/* Ensure text is selectable */
+.textLayer {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+

@@ -95,6 +95,7 @@ class BookResponse(BaseModel):
     file_path: str
     file_type: FileType
     file_size: int
+    cover_image_url: Optional[str] = None
     is_processed: bool
     processing_error: Optional[str] = None
     page_count: Optional[int] = None

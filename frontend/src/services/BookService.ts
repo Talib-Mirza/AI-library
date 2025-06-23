@@ -8,6 +8,7 @@ export interface Book {
   author: string;
   description?: string;
   coverUrl?: string;
+  cover_image_url?: string;  // Backend field name
   fileType?: string;
   file_type?: string;  // snake_case version
   uploadDate?: string;
@@ -37,7 +38,21 @@ class BookService {
       console.log('[BookService] Fetching all books');
       const response = await api.get('/books/');
       console.log('[BookService] Books response:', response.data);
-      return response.data.items;
+      
+      // Map backend fields to frontend fields
+      const books = response.data.items.map((book: any) => ({
+        ...book,
+        coverUrl: book.cover_image_url || book.coverUrl,
+        fileType: book.file_type || book.fileType,
+        uploadDate: book.created_at || book.upload_date || book.uploadDate,
+        pageCount: book.page_count || book.pageCount,
+        filePath: book.file_path || book.filePath,
+        isProcessed: book.is_processed !== undefined ? book.is_processed : book.isProcessed,
+        processingError: book.processing_error || book.processingError,
+        fileSize: book.file_size || book.fileSize,
+      }));
+      
+      return books;
     } catch (error: any) {
       console.error('[BookService] Error in getBooks:', error);
       if (error.response?.status === 401) {
@@ -47,7 +62,18 @@ class BookService {
         // Handle redirect by retrying with the correct URL
         try {
           const response = await api.get('/books/');
-          return response.data.items;
+          const books = response.data.items.map((book: any) => ({
+            ...book,
+            coverUrl: book.cover_image_url || book.coverUrl,
+            fileType: book.file_type || book.fileType,
+            uploadDate: book.created_at || book.upload_date || book.uploadDate,
+            pageCount: book.page_count || book.pageCount,
+            filePath: book.file_path || book.filePath,
+            isProcessed: book.is_processed !== undefined ? book.is_processed : book.isProcessed,
+            processingError: book.processing_error || book.processingError,
+            fileSize: book.file_size || book.fileSize,
+          }));
+          return books;
         } catch (retryError: any) {
           console.error('[BookService] Error after redirect:', retryError);
           throw retryError;
@@ -80,7 +106,20 @@ class BookService {
         bookData.fileType = 'pdf';
       }
       
-      return bookData;
+      // Map backend fields to frontend fields
+      const mappedBook = {
+        ...bookData,
+        coverUrl: bookData.cover_image_url || bookData.coverUrl,
+        fileType: bookData.file_type || bookData.fileType,
+        uploadDate: bookData.created_at || bookData.upload_date || bookData.uploadDate,
+        pageCount: bookData.page_count || bookData.pageCount,
+        filePath: bookData.file_path || bookData.filePath,
+        isProcessed: bookData.is_processed !== undefined ? bookData.is_processed : bookData.isProcessed,
+        processingError: bookData.processing_error || bookData.processingError,
+        fileSize: bookData.file_size || bookData.fileSize,
+      };
+      
+      return mappedBook;
     } catch (error: any) {
       console.error('[BookService] Error in getBook:', {
         error,
@@ -210,7 +249,35 @@ class BookService {
           'Content-Type': 'multipart/form-data',
         },
       });
-      return response.data;
+      
+      const bookData = response.data;
+      
+      console.log('[BookService] Create book response:', {
+        data: bookData,
+        coverImageUrl: bookData?.cover_image_url,
+        fileType: bookData?.file_type
+      });
+      
+      // Map backend fields to frontend fields (same as getBook)
+      const mappedBook = {
+        ...bookData,
+        coverUrl: bookData.cover_image_url || bookData.coverUrl,
+        fileType: bookData.file_type || bookData.fileType,
+        uploadDate: bookData.created_at || bookData.upload_date || bookData.uploadDate,
+        pageCount: bookData.page_count || bookData.pageCount,
+        filePath: bookData.file_path || bookData.filePath,
+        isProcessed: bookData.is_processed !== undefined ? bookData.is_processed : bookData.isProcessed,
+        processingError: bookData.processing_error || bookData.processingError,
+        fileSize: bookData.file_size || bookData.fileSize,
+      };
+      
+      console.log('[BookService] Mapped book data:', {
+        original: bookData,
+        mapped: mappedBook,
+        coverUrl: mappedBook.coverUrl
+      });
+      
+      return mappedBook;
     } catch (error) {
       console.error('Error creating book:', error);
       throw error;
@@ -248,4 +315,4 @@ class BookService {
   }
 }
 
-export default new BookService();
+export default new BookService(); 

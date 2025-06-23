@@ -37,6 +37,7 @@ async def create_book(
     author: str = Form(None),
     description: str = Form(None),
     file: UploadFile = File(...),
+    cover_image: UploadFile = File(None),  # Optional cover image
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
@@ -70,6 +71,30 @@ async def create_book(
             detail=f"File too large. Maximum size: {max_mb:.1f}MB",
         )
     
+    # Validate cover image if provided
+    cover_image_content = None
+    if cover_image and cover_image.filename:
+        # Check if it's a valid image file
+        image_ext = os.path.splitext(cover_image.filename)[1].lower().lstrip(".")
+        allowed_image_types = ["jpg", "jpeg", "png", "gif", "webp"]
+        
+        if image_ext not in allowed_image_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid image type. Allowed types: {', '.join(allowed_image_types)}",
+            )
+        
+        # Read cover image content
+        cover_image_content = await cover_image.read()
+        
+        # Check cover image size (max 5MB)
+        max_image_size = 5 * 1024 * 1024  # 5MB
+        if len(cover_image_content) > max_image_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cover image too large. Maximum size: 5MB",
+            )
+    
     # Create book
     book_service = BookService(db)
     book_create = BookCreate(
@@ -87,6 +112,8 @@ async def create_book(
         file_type=file_type,
         file_size=file_size,
         user_id=current_user.id,
+        cover_image=cover_image,
+        cover_image_content=cover_image_content,
     )
     
     # Start processing the book in the background
@@ -397,4 +424,70 @@ async def get_book_content(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
+        ) 
+
+@router.get("/{book_id}/pdf")
+async def get_book_pdf(
+    book_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    Get PDF file for viewing in browser.
+    
+    Returns the PDF file with inline content disposition for browser viewing.
+    """
+    book_service = BookService(db)
+    
+    try:
+        book = await book_service.get_book_by_id(book_id)
+        
+        if not book:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Book not found",
+            )
+        
+        # Check ownership
+        if book.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions",
+            )
+        
+        # Only serve PDF files
+        if book.file_type != FileType.PDF:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This endpoint only serves PDF files",
+            )
+        
+        # Get file path
+        file_path = book.file_path
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="PDF file not found on disk",
+            )
+        
+        # Get original filename from the stored path
+        original_filename = os.path.basename(file_path)
+        
+        # Return PDF with inline content disposition for browser viewing
+        return FileResponse(
+            file_path,
+            filename=original_filename,
+            media_type="application/pdf",
+            content_disposition_type="inline"  # This allows viewing in browser
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API] Error serving PDF: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error serving PDF: {str(e)}"
         ) 

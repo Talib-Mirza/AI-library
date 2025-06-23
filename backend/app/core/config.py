@@ -71,7 +71,6 @@ class Settings(BaseSettings):
     
     # Vector Store Settings
     VECTOR_DB_PATH: str = "vector_db"
-    CHROMA_DB_PATH: str = "chroma_db"
     WEAVIATE_URL: Optional[str] = None
     WEAVIATE_API_KEY: Optional[str] = None
     
@@ -79,6 +78,8 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     MAX_CONTEXT_LENGTH: int = 4000
+    
+    CHROMA_DB_PATH: str = "chroma_db"
     
     class Config:
         env_file = str(Path(__file__).resolve().parents[3] / ".env")
