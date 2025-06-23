@@ -25,9 +25,10 @@ A comprehensive SaaS AI-powered eLibrary web application that enables users to u
 - **PDF.js** for document viewing
 - **Framer Motion** + **GSAP** for animations
 - **Axios** for HTTP requests
+- **Node** (Node.js 20.19.1)
 
 ### Backend
-- **FastAPI** (Python 3.11+)
+- **FastAPI** (Python 3.12.2)
 - **SQLAlchemy 2.0** ORM with **AsyncPG**
 - **PostgreSQL** database
 - **JWT** authentication
