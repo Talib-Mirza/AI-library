@@ -4,6 +4,7 @@ import os
 import sys
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.engine import make_url
+import ssl
 
 from alembic import context
 
@@ -80,12 +81,18 @@ async def run_async_migrations():
     url = make_url(config.get_main_option("sqlalchemy.url"))
     host = (url.host or "").lower()
     require_ssl = host not in ("localhost", "127.0.0.1") and not host.endswith(".local") and not host.endswith(".internal")
+    ssl_ctx = None
+    if require_ssl:
+        ssl_ctx = ssl.create_default_context()
+        if not settings.DB_SSL_VERIFY:
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
 
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=None,
-        connect_args={"ssl": True} if require_ssl else {},
+        connect_args={"ssl": ssl_ctx if ssl_ctx else None} if require_ssl else {},
     )
 
     async with connectable.connect() as connection:

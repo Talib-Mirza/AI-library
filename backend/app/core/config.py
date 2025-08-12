@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DATABASE_POOL_SIZE: int = 5
     DATABASE_MAX_OVERFLOW: int = 10
+    # Control SSL verification for remote DBs. Set to False locally if cert chain fails.
+    DB_SSL_VERIFY: bool = True
     
     # Redis and Celery
     REDIS_URL: Optional[str] = None
