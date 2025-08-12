@@ -14,6 +14,10 @@ sys.path.insert(0, backend_dir)
 # access to the values within the .ini file in use.
 config = context.config
 
+# Load DB URL from backend settings to avoid hardcoding credentials in alembic.ini
+from backend.app.core.config import settings  # type: ignore
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
@@ -58,6 +62,7 @@ def do_run_migrations(connection):
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
+        compare_server_default=True,
     )
 
     with context.begin_transaction():

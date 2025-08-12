@@ -1,3 +1,7 @@
+import api from '../utils/axiosConfig';
+
+export class QuotaError extends Error { constructor(message: string){ super(message); this.name='QuotaError'; } }
+
 interface EmbedDocumentRequest {
   document_text: string;
   document_id: string;
@@ -41,49 +45,37 @@ interface DocumentStats {
 }
 
 class RagService {
-  private baseUrl = '/api/rag';
-
   private async makeRequest<T>(
     endpoint: string,
-    options: RequestInit = {}
+    data?: any,
+    method: 'GET' | 'POST' = 'GET'
   ): Promise<T> {
-    const token = localStorage.getItem('token');
-    
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(error.detail || `HTTP ${response.status}`);
+    try {
+      const response = method === 'POST' 
+        ? await api.post(`/rag${endpoint}`, data)
+        : await api.get(`/rag${endpoint}`);
+      
+      return response.data;
+    } catch (error: any) {
+      const status = error.response?.status;
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      if (status === 402) throw new QuotaError(errorMessage);
+      throw new Error(errorMessage);
     }
-
-    return response.json();
   }
 
   /**
    * Embed a document's text for later querying
    */
   async embedDocument(request: EmbedDocumentRequest): Promise<EmbedDocumentResponse> {
-    return this.makeRequest<EmbedDocumentResponse>('/embed', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+    return this.makeRequest<EmbedDocumentResponse>('/embed', request, 'POST');
   }
 
   /**
    * Ask a question about a document using RAG
    */
   async askQuestion(request: AskQuestionRequest): Promise<AskQuestionResponse> {
-    return this.makeRequest<AskQuestionResponse>('/ask', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+    return this.makeRequest<AskQuestionResponse>('/ask', request, 'POST');
   }
 
   /**
@@ -104,9 +96,13 @@ class RagService {
    * Delete embeddings for a document
    */
   async deleteDocumentEmbeddings(documentId: string): Promise<{ message: string }> {
-    return this.makeRequest<{ message: string }>(`/documents/${documentId}`, {
-      method: 'DELETE',
-    });
+    try {
+      const response = await api.delete(`/rag/documents/${documentId}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      throw new Error(errorMessage);
+    }
   }
 
   /**
@@ -119,9 +115,7 @@ class RagService {
     message: string;
     chunk_count: number;
   }> {
-    return this.makeRequest(`/books/${bookId}/embed`, {
-      method: 'POST',
-    });
+    return this.makeRequest(`/books/${bookId}/embed`, {}, 'POST');
   }
 
   /**
@@ -133,12 +127,9 @@ class RagService {
     conversationHistory?: Array<{ role: string; content: string }>
   ): Promise<AskQuestionResponse> {
     return this.makeRequest(`/books/${bookId}/ask`, {
-      method: 'POST',
-      body: JSON.stringify({
-        question,
-        conversation_history: conversationHistory,
-      }),
-    });
+      question,
+      conversation_history: conversationHistory,
+    }, 'POST');
   }
 
   /**

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_within_upload_quota
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.book import FileType
@@ -27,6 +27,7 @@ from app.schemas.book import (
 )
 from app.schemas.common import PaginatedResponse, PaginationParams, SuccessResponse
 from app.services.book import BookService
+from app.services.usage_service import usage_service
 
 router = APIRouter()
 
@@ -40,6 +41,7 @@ async def create_book(
     cover_image: UploadFile = File(None),  # Optional cover image
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _=Depends(require_within_upload_quota)
 ) -> Any:
     """
     Create a new book by uploading a file.
@@ -115,7 +117,8 @@ async def create_book(
         cover_image=cover_image,
         cover_image_content=cover_image_content,
     )
-    
+    # increment usage
+    await usage_service.increment(current_user.id, 'book_uploads', 1)
     # Start processing the book in the background
     await book_service.process_book_background(book.id)
     
@@ -317,17 +320,6 @@ async def list_bookmarks(
 
 # Similar endpoints for highlights and annotations can be added here 
 
-@router.get("/{book_id}/content", response_model=Dict)
-async def get_book_content(
-    book_id: int,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> Dict:
-    """
-    Get processed content of a book.
-    """
-    book_service = BookService(db)
-    return await book_service.get_book_content(book_id, current_user.id)
 
 @router.get("/{book_id}/content", response_model=None)
 async def get_book_content(

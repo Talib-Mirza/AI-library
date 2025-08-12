@@ -32,6 +32,25 @@ export interface Book {
 }
 
 class BookService {
+  /**
+   * Helper method to map backend fields to frontend fields
+   * Reduces code duplication across multiple methods
+   */
+  private mapBookFields(bookData: any): Book {
+    return {
+      ...bookData,
+      coverUrl: bookData.cover_image_url || bookData.coverUrl,
+      fileType: bookData.file_type || bookData.fileType,
+      uploadDate: bookData.created_at || bookData.upload_date || bookData.uploadDate,
+      pageCount: bookData.page_count || bookData.pageCount,
+      filePath: bookData.file_path || bookData.filePath,
+      originalFilename: bookData.original_filename || bookData.originalFilename,
+      isProcessed: bookData.is_processed !== undefined ? bookData.is_processed : bookData.isProcessed,
+      processingError: bookData.processing_error || bookData.processingError,
+      fileSize: bookData.file_size || bookData.fileSize,
+    };
+  }
+
   // Get all books for the current user
   async getBooks() {
     try {
@@ -39,18 +58,8 @@ class BookService {
       const response = await api.get('/books/');
       console.log('[BookService] Books response:', response.data);
       
-      // Map backend fields to frontend fields
-      const books = response.data.items.map((book: any) => ({
-        ...book,
-        coverUrl: book.cover_image_url || book.coverUrl,
-        fileType: book.file_type || book.fileType,
-        uploadDate: book.created_at || book.upload_date || book.uploadDate,
-        pageCount: book.page_count || book.pageCount,
-        filePath: book.file_path || book.filePath,
-        isProcessed: book.is_processed !== undefined ? book.is_processed : book.isProcessed,
-        processingError: book.processing_error || book.processingError,
-        fileSize: book.file_size || book.fileSize,
-      }));
+      // Map backend fields to frontend fields using helper method
+      const books = response.data.items.map((book: any) => this.mapBookFields(book));
       
       return books;
     } catch (error: any) {
@@ -62,17 +71,7 @@ class BookService {
         // Handle redirect by retrying with the correct URL
         try {
           const response = await api.get('/books/');
-          const books = response.data.items.map((book: any) => ({
-            ...book,
-            coverUrl: book.cover_image_url || book.coverUrl,
-            fileType: book.file_type || book.fileType,
-            uploadDate: book.created_at || book.upload_date || book.uploadDate,
-            pageCount: book.page_count || book.pageCount,
-            filePath: book.file_path || book.filePath,
-            isProcessed: book.is_processed !== undefined ? book.is_processed : book.isProcessed,
-            processingError: book.processing_error || book.processingError,
-            fileSize: book.file_size || book.fileSize,
-          }));
+          const books = response.data.items.map((book: any) => this.mapBookFields(book));
           return books;
         } catch (retryError: any) {
           console.error('[BookService] Error after redirect:', retryError);
@@ -101,42 +100,22 @@ class BookService {
         throw new Error('No book data received');
       }
       
-      if (!bookData.fileType) {
+      if (!bookData.fileType && !bookData.file_type) {
         console.warn('[BookService] Book missing fileType, defaulting to PDF');
         bookData.fileType = 'pdf';
       }
       
-      // Map backend fields to frontend fields
-      const mappedBook = {
-        ...bookData,
-        coverUrl: bookData.cover_image_url || bookData.coverUrl,
-        fileType: bookData.file_type || bookData.fileType,
-        uploadDate: bookData.created_at || bookData.upload_date || bookData.uploadDate,
-        pageCount: bookData.page_count || bookData.pageCount,
-        filePath: bookData.file_path || bookData.filePath,
-        isProcessed: bookData.is_processed !== undefined ? bookData.is_processed : bookData.isProcessed,
-        processingError: bookData.processing_error || bookData.processingError,
-        fileSize: bookData.file_size || bookData.fileSize,
-      };
-      
-      return mappedBook;
+      // Map backend fields to frontend fields using helper method
+      return this.mapBookFields(bookData);
     } catch (error: any) {
-      console.error('[BookService] Error in getBook:', {
-        error,
-        message: error.message,
-        response: error.response?.data,
-        stack: error.stack
-      });
-      
+      console.error('[BookService] Error in getBook:', error);
       if (error.response?.status === 401) {
-        throw new Error('Please log in to access this book');
-      } else if (error.response?.status === 403) {
-        throw new Error('You do not have permission to access this book');
-      } else if (error.response?.status === 404) {
-        throw new Error('Book not found');
-      } else {
-        throw new Error(error.response?.data?.detail || 'Failed to load book');
+        throw new Error('Unauthorized: Please log in again');
       }
+      if (error.response?.status === 404) {
+        throw new Error('Book not found');
+      }
+      throw error;
     }
   }
 
@@ -258,18 +237,8 @@ class BookService {
         fileType: bookData?.file_type
       });
       
-      // Map backend fields to frontend fields (same as getBook)
-      const mappedBook = {
-        ...bookData,
-        coverUrl: bookData.cover_image_url || bookData.coverUrl,
-        fileType: bookData.file_type || bookData.fileType,
-        uploadDate: bookData.created_at || bookData.upload_date || bookData.uploadDate,
-        pageCount: bookData.page_count || bookData.pageCount,
-        filePath: bookData.file_path || bookData.filePath,
-        isProcessed: bookData.is_processed !== undefined ? bookData.is_processed : bookData.isProcessed,
-        processingError: bookData.processing_error || bookData.processingError,
-        fileSize: bookData.file_size || bookData.fileSize,
-      };
+      // Map backend fields to frontend fields using helper method
+      const mappedBook = this.mapBookFields(bookData);
       
       console.log('[BookService] Mapped book data:', {
         original: bookData,
@@ -278,8 +247,9 @@ class BookService {
       });
       
       return mappedBook;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating book:', error);
+      // Re-throw to allow caller to handle quota-specific errors
       throw error;
     }
   }
@@ -313,6 +283,20 @@ class BookService {
       }
     }
   }
+
+  // Increment TTS minutes for the current user
+  static async incrementTTSMinutes(minutes: number) {
+    try {
+      // POST to /auth/increment-tts-minutes or similar endpoint
+      const response = await api.post('/auth/increment-tts-minutes', { minutes });
+      return response.data;
+    } catch (error) {
+      console.error('Error incrementing TTS minutes:', error);
+      throw error;
+    }
+  }
 }
 
-export default new BookService(); 
+// Export both the class and a default instance
+export { BookService };
+export default new BookService();

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.book import FileType
 
@@ -56,8 +56,16 @@ class BookmarkResponse(BookmarkBase):
     """Bookmark response model."""
     id: int
     book_id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: str
+    updated_at: str
+    
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def validate_datetime_fields(cls, v):
+        """Convert datetime to string if needed."""
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
     
     class Config:
         from_attributes = True
@@ -67,8 +75,16 @@ class HighlightResponse(HighlightBase):
     """Highlight response model."""
     id: int
     book_id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: str
+    updated_at: str
+    
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def validate_datetime_fields(cls, v):
+        """Convert datetime to string if needed."""
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
     
     class Config:
         from_attributes = True
@@ -78,8 +94,16 @@ class AnnotationResponse(AnnotationBase):
     """Annotation response model."""
     id: int
     book_id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: str
+    updated_at: str
+    
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def validate_datetime_fields(cls, v):
+        """Convert datetime to string if needed."""
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
     
     class Config:
         from_attributes = True
@@ -100,8 +124,16 @@ class BookResponse(BaseModel):
     processing_error: Optional[str] = None
     page_count: Optional[int] = None
     user_id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: str
+    updated_at: str
+    
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def validate_datetime_fields(cls, v):
+        """Convert datetime to string if needed."""
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
     
     class Config:
         from_attributes = True

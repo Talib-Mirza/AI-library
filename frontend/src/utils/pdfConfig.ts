@@ -14,14 +14,16 @@ export const initializePDFWorker = async (): Promise<void> => {
     return initializationPromise;
   }
   
+  const DEBUG = import.meta.env?.MODE === 'development';
+  
   initializationPromise = (async () => {
     try {
       await setupPDFWorker();
       workerInitialized = true;
-      console.log('[PDFConfig] Worker initialization successful');
+      if (DEBUG) console.debug('[PDFConfig] Worker initialization successful');
     } catch (error) {
       console.warn('[PDFConfig] Worker initialization failed, continuing without worker:', error);
-      // Don't set workerInitialized to true, but don't throw either
+      workerInitialized = true; // Mark as initialized even if worker failed
       // PDF.js will fall back to main thread processing
     }
   })();

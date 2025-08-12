@@ -6,13 +6,37 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.faiss_rag_service import faiss_rag_service
 from app.services.book import BookService
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_within_ai_query_quota
+from app.services.usage_service import usage_service
 from app.models.user import User
 from app.db.session import get_db
+from app.core.config import settings
+from app.services.user import UserService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+@router.get("/health")
+async def rag_health_check():
+    """Check if RAG service is properly initialized"""
+    try:
+        is_initialized = faiss_rag_service.initialized
+        has_chat_model = faiss_rag_service.chat_model is not None
+        has_embeddings = faiss_rag_service.embeddings is not None
+        
+        return {
+            "status": "ok" if is_initialized else "error",
+            "initialized": is_initialized,
+            "has_chat_model": has_chat_model,
+            "has_embeddings": has_embeddings,
+            "openai_key_configured": bool(settings.OPENAI_API_KEY)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 # Pydantic models for request/response
 class EmbedDocumentRequest(BaseModel):
@@ -90,7 +114,8 @@ async def embed_document(
 @router.post("/ask", response_model=AskQuestionResponse)
 async def ask_question(
     request: AskQuestionRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _=Depends(require_within_ai_query_quota)
 ):
     """
     Ask a question about an embedded document
@@ -108,6 +133,9 @@ async def ask_question(
         
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
+        
+        # increment usage
+        await usage_service.increment(current_user.id, 'ai_queries', 1)
         
         return AskQuestionResponse(
             answer=result["answer"],
@@ -276,7 +304,8 @@ async def ask_question_about_book(
     book_id: int,
     request: Dict[str, Any] = Body(...),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_within_ai_query_quota)
 ):
     """
     Ask a question about a specific book
@@ -311,6 +340,9 @@ async def ask_question_about_book(
         
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
+        
+        # increment usage
+        await usage_service.increment(current_user.id, 'ai_queries', 1)
         
         # Add book information to response
         result["book"] = {

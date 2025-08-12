@@ -18,46 +18,37 @@ from app.services.user import UserService
     
 
 async def create_initial_admin() -> None:
-    """Create initial admin user if no users exist."""
+    """Create initial admin user if no admin exists."""
     try:
         async with async_session_factory() as session:
-            # Check if any users exist
-            result = await session.execute(text("SELECT COUNT(*) FROM users"))
-            count = result.scalar()
+            # Check if any admin users exist
+            result = await session.execute(text("SELECT COUNT(*) FROM users WHERE is_admin = :flag"), {"flag": True})
+            admin_count = result.scalar() or 0
             
-            if count == 0:
+            if admin_count == 0:
                 print("Creating initial admin user...")
                 user_service = UserService()
+                email = settings.INIT_ADMIN_EMAIL or "admin@thesyx.com"
+                password = settings.INIT_ADMIN_PASSWORD or "Dragonborn420!!"
                 admin_user = User(
-                    email="admin@ailibrary.com",
+                    email=email,
                     full_name="Admin User",
-                    hashed_password=user_service.get_password_hash("admin123"),  # Change this password!
+                    hashed_password=user_service.get_password_hash(password),  # Change this password!
                     is_active=True,
                     is_admin=True,
                     is_verified=True,
-                    subscription_status="active",  # Set subscription status for admin
-                    subscription_tier="premium"  # Set subscription tier for admin
+                    subscription_status="active",
+                    subscription_tier="pro"
                 )
                 
                 session.add(admin_user)
                 await session.commit()
                 print("Initial admin user created successfully!")
-                print("Email: admin@ailibrary.com")
-                print("Password: admin123")
-                print("Please change these credentials after first login!")
+                print(f"Email: {email}")
+                print(f"Password: {password}")
+                print("Please change these credentials after first login and set secure values in .env (INIT_ADMIN_EMAIL/INIT_ADMIN_PASSWORD)!")
             else:
-                print("Users already exist, updating subscription status...")
-                # Update existing users to have active subscriptions
-                await session.execute(
-                    text("""
-                        UPDATE users 
-                        SET subscription_status = 'active', 
-                            subscription_tier = 'basic' 
-                        WHERE subscription_status IS NULL
-                    """)
-                )
-                await session.commit()
-                print("Updated subscription status for existing users")
+                print("Admin user already exists. Skipping admin creation.")
     
     except Exception as e:
         print(f"Failed to create initial admin: {str(e)}")
@@ -74,44 +65,8 @@ async def init_db() -> None:
             await conn.run_sync(Base.metadata.create_all)
         print("Database tables created successfully!")
 
-        async with async_session_factory() as session:
-            # Check if any users exist
-            result = await session.execute(text("SELECT COUNT(*) FROM users"))
-            count = result.scalar()
-            
-            if count == 0:
-                print("Creating initial admin user...")
-                user_service = UserService()
-                admin_user = User(
-                    email="admin@ailibrary.com",
-                    full_name="Admin User",
-                    hashed_password=user_service.get_password_hash("admin123"),  # Change this password!
-                    is_active=True,
-                    is_admin=True,
-                    is_verified=True,
-                    subscription_status="active",  # Set subscription status for admin
-                    subscription_tier="premium"  # Set subscription tier for admin
-                )
-                
-                session.add(admin_user)
-                await session.commit()
-                print("Initial admin user created successfully!")
-                print("Email: admin@ailibrary.com")
-                print("Password: admin123")
-                print("Please change these credentials after first login!")
-            else:
-                print("Users already exist, updating subscription status...")
-                # Update existing users to have active subscriptions
-                await session.execute(
-                    text("""
-                        UPDATE users 
-                        SET subscription_status = 'active', 
-                            subscription_tier = 'basic' 
-                        WHERE subscription_status IS NULL
-                    """)
-                )
-                await session.commit()
-                print("Updated subscription status for existing users")
+        # Ensure an admin account exists
+        await create_initial_admin()
     
     except Exception as e:
         print(f"Failed to initialize database: {str(e)}")

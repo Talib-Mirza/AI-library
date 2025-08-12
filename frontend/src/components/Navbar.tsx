@@ -4,12 +4,13 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import BillingService from '../services/BillingService';
 
 gsap.registerPlugin(ScrollTrigger);
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
@@ -58,6 +59,16 @@ const Navbar = () => {
     return location.pathname === path;
   };
 
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const avatarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) setShowUserMenu(false);
+    };
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
+  }, []);
+
   return (
     <header 
       ref={navRef}
@@ -100,6 +111,42 @@ const Navbar = () => {
                 <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></span>
               )}
             </Link>
+
+            <Link 
+              to="/pricing" 
+              className={`relative px-4 py-2 font-medium transition-all duration-300 group ${
+                isActive('/pricing') 
+                  ? 'text-blue-600 dark:text-blue-400' 
+                  : 'text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400'
+              }`}
+            >
+              <span className="relative z-10">Pricing</span>
+              <div className={`absolute inset-0 rounded-lg bg-blue-50 dark:bg-blue-900/20 transform transition-transform duration-300 ${
+                isActive('/pricing') ? 'scale-100' : 'scale-0 group-hover:scale-100'
+              }`}></div>
+              {isActive('/pricing') && (
+                <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></span>
+              )}
+            </Link>
+
+            {isAuthenticated && user?.is_admin && (
+              <Link 
+                to="/admin" 
+                className={`relative px-4 py-2 font-medium transition-all duration-300 group ${
+                  isActive('/admin') 
+                    ? 'text-blue-600 dark:text-blue-400' 
+                    : 'text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400'
+                }`}
+              >
+                <span className="relative z-10">Admin</span>
+                <div className={`absolute inset-0 rounded-lg bg-blue-50 dark:bg-blue-900/20 transform transition-transform duration-300 ${
+                  isActive('/admin') ? 'scale-100' : 'scale-0 group-hover:scale-100'
+                }`}></div>
+                {isActive('/admin') && (
+                  <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></span>
+                )}
+              </Link>
+            )}
             
             {isAuthenticated ? (
               <>
@@ -119,33 +166,44 @@ const Navbar = () => {
                     <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></span>
                   )}
                 </Link>
-                
-                <button 
-                  onClick={handleLogout}
-                  className="relative px-4 py-2 text-gray-700 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400 font-medium transition-all duration-300 group"
-                >
-                  <span className="relative z-10">Logout</span>
-                  <div className="absolute inset-0 rounded-lg bg-red-50 dark:bg-red-900/20 transform scale-0 group-hover:scale-100 transition-transform duration-300"></div>
-                </button>
-                
-                {user && user.full_name && (
-                  <div className="flex items-center space-x-3 ml-6 pl-6 border-l border-gray-200 dark:border-gray-700">
-                    <div className="relative">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium shadow-lg transform transition-transform hover:scale-110 duration-300">
-                        {user.full_name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full blur opacity-30 group-hover:opacity-100 transition duration-300"></div>
+
+                {/* Avatar dropdown */}
+                <div ref={avatarRef} className="relative">
+                  <button onClick={() => setShowUserMenu(s => !s)} className="relative group" aria-label="User menu">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium shadow-lg transform transition-transform hover:scale-110 duration-300">
+                      <span className="text-white text-lg font-bold">AI</span>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-normal text-gray-600 dark:text-gray-400">
-                        Welcome back,
-                      </span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {user.full_name}
-                      </span>
+                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full blur opacity-30 group-hover:opacity-100 transition duration-300"></div>
+                  </button>
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden z-50">
+                      <Link to="/profile" className="block px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700" onClick={() => setShowUserMenu(false)}>
+                        Profile
+                      </Link>
+                      <button className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700" onClick={async () => {
+                        try {
+                          const url = await BillingService.createPortalSession();
+                          window.open(url, '_blank', 'noopener');
+                        } catch (e) {
+                          console.error('Portal session error', e);
+                          try {
+                            const fallback = await BillingService.getPortalLink();
+                            window.open(fallback, '_blank', 'noopener');
+                          } catch (e2) {
+                            console.error('Portal fallback link error', e2);
+                          }
+                        } finally {
+                          setShowUserMenu(false);
+                        }
+                      }}>
+                        Manage Billing
+                      </button>
+                      <button className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => { handleLogout(); setShowUserMenu(false); }}>
+                        Logout
+                      </button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             ) : (
               <>
@@ -206,24 +264,24 @@ const Navbar = () => {
           <div className="lg:hidden flex items-center space-x-4">
             <button
               onClick={toggleTheme}
-              className="relative w-12 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center transition-all duration-300 focus:outline-none shadow-inner"
+              className="relative w-14 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center transition-all duration-300 focus:outline-none shadow-inner"
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
               <div
-                className={`w-5 h-5 rounded-full transform transition-all duration-500 flex items-center justify-center shadow-md ${
+                className={`w-6 h-6 rounded-full transform transition-all duration-500 flex items-center justify-center shadow-md ${
                   theme === 'dark' 
-                    ? 'translate-x-6 bg-gradient-to-br from-purple-600 to-blue-600' 
+                    ? 'translate-x-7 bg-gradient-to-br from-purple-600 to-blue-600' 
                     : 'translate-x-1 bg-gradient-to-br from-yellow-400 to-orange-500'
                 }`}
               >
                 {theme === 'dark' ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
                   </svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                  </svg>
+                </svg>
                 )}
               </div>
             </button>
@@ -260,6 +318,18 @@ const Navbar = () => {
               >
                 Home
               </Link>
+
+              <Link 
+                to="/pricing" 
+                onClick={() => setMobileMenuOpen(false)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors duration-300 ${
+                  isActive('/pricing') 
+                    ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' 
+                    : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:bg-gray-800'
+                }`}
+              >
+                Pricing
+              </Link>
               
               {isAuthenticated ? (
                 <>
@@ -274,7 +344,20 @@ const Navbar = () => {
                   >
                     Dashboard
                   </Link>
-                  
+                  {user?.is_admin && (
+                    <Link 
+                      to="/admin" 
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors duration-300 ${
+                        isActive('/admin') 
+                          ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' 
+                          : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      Admin
+                    </Link>
+                  )}
+
                   <button 
                     onClick={handleLogout}
                     className="px-4 py-2 text-left rounded-lg text-gray-700 hover:text-red-600 hover:bg-red-50 dark:text-gray-300 dark:hover:text-red-400 dark:hover:bg-red-900/20 font-medium transition-colors duration-300"
@@ -282,21 +365,24 @@ const Navbar = () => {
                     Logout
                   </button>
                   
-                  {user && user.full_name && (
-                    <div className="flex items-center space-x-3 px-4 py-2 mt-4 border-t border-gray-200 dark:border-gray-700">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium shadow-lg">
-                        {user.full_name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-normal text-gray-600 dark:text-gray-400">
-                          Welcome back,
-                        </span>
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {user.full_name}
-                        </span>
-                      </div>
+                  {/* Profile Circle in Mobile Menu - always default logo */}
+                  <div className="flex items-center space-x-3 px-4 py-2 mt-4 border-t border-gray-200 dark:border-gray-700">
+                    <Link 
+                      to="/profile" 
+                      className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium shadow-lg"
+                      title="View Profile"
+                    >
+                      <span className="text-white text-lg font-bold">AI</span>
+                    </Link>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-normal text-gray-600 dark:text-gray-400">
+                        Welcome back,
+                      </span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {/* User's full name can be displayed here if needed */}
+                      </span>
                     </div>
-                  )}
+                  </div>
                 </>
               ) : (
                 <>
@@ -329,4 +415,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar; 
+export default Navbar;

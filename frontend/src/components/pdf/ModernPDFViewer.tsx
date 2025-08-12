@@ -25,9 +25,9 @@ interface ViewerState {
 }
 
 // Constants for virtualization
-const ITEM_HEIGHT = 820;
-const OVERSCAN_COUNT = 1;
-const PRELOAD_THRESHOLD = 2;
+const ITEM_HEIGHT = 820; // Slightly reduced to fit more comfortably
+const OVERSCAN_COUNT = 2; // Increase overscan mildly for smoother scrolling
+const PRELOAD_THRESHOLD = 3; // Preload a bit more ahead
 const FIXED_SCALE = 1.0; // Fixed scale instead of variable
 
 // Types for the virtualized page wrapper
@@ -63,6 +63,19 @@ const ModernPDFViewer: React.FC<ModernPDFViewerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<List>(null);
 
+  // Expose List reference globally for TTSController access
+  useEffect(() => {
+    if (listRef.current) {
+      (window as any).__PDF_VIEWER_LIST__ = listRef.current;
+      console.log('📄 ModernPDFViewer: Exposed List reference globally for TTS access');
+    }
+    return () => {
+      if ((window as any).__PDF_VIEWER_LIST__) {
+        delete (window as any).__PDF_VIEWER_LIST__;
+      }
+    };
+  }, [state.document]);
+
   // Load PDF document
   useEffect(() => {
     const loadPDF = async () => {
@@ -79,8 +92,8 @@ const ModernPDFViewer: React.FC<ModernPDFViewerProps> = ({
           currentPage: 1,
         }));
 
-        // Preload first few pages silently
-        OptimizedPDFService.preloadPages(document, 1, FIXED_SCALE, 2).catch(() => {});
+        // Preload first few pages silently (wider window for large docs)
+        OptimizedPDFService.preloadPages(document, 1, FIXED_SCALE, PRELOAD_THRESHOLD).catch(() => {});
         
       } catch (error) {
         setState(prev => ({
@@ -124,7 +137,7 @@ const ModernPDFViewer: React.FC<ModernPDFViewerProps> = ({
     }
   }, [state.document]);
 
-  // Handle text selection from hover interactions
+  // Handle text selection from PDF.js text layer
   const handleTextSelection = useCallback((text: string, spans: PDFTextSpan[]) => {
     setState(prev => ({ ...prev, selectedText: text }));
     onTextSelect?.(text, spans);
@@ -213,7 +226,7 @@ const ModernPDFViewer: React.FC<ModernPDFViewerProps> = ({
   }
 
   return (
-    <div className={`relative w-full flex flex-col ${className}`} style={{ height: 'calc(100vh - 100px)' }} ref={containerRef}>
+    <div className={`modern-pdf-viewer relative w-full flex flex-col ${className}`} style={{ height: 'calc(100vh - 100px)' }} ref={containerRef} data-testid="pdf-viewer">
       {/* PDF Controls */}
       <div className="flex-shrink-0">
         <PDFControls
@@ -273,7 +286,7 @@ const ModernPDFViewer: React.FC<ModernPDFViewerProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
                       d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              <span className="text-sm">Hover-selected: "{state.selectedText.slice(0, 50)}..."</span>
+              <span className="text-sm">Selected: "{state.selectedText.slice(0, 50)}..."</span>
               <button
                 onClick={() => setState(prev => ({ ...prev, selectedText: '' }))}
                 className="ml-2 text-blue-200 hover:text-white"
@@ -304,8 +317,8 @@ const VirtualizedPDFPageWrapper = memo<VirtualizedPageWrapperProps>(({ index, st
       justifyContent: 'center',
       alignItems: 'flex-start',
       padding: '0px',
-      paddingTop: index === 0 ? '4px' : '1px',
-      paddingBottom: '1px',
+      paddingTop: index === 0 ? '16px' : '8px',
+      paddingBottom: '8px',
       overflow: 'hidden',
     }}>
       <VirtualizedPDFPage

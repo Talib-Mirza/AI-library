@@ -147,64 +147,34 @@ const FeaturesSection = () => {
 
   const features = [
     {
-      title: "Smart Dashboard",
-      description: "Organize your entire digital library with AI-powered categorization, search, and personalized recommendations.",
+      title: "AI Chat for Your Documents",
+      description: "Ask questions about your uploaded PDFs and get grounded, page-aware answers with helpful references.",
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-      color: "from-blue-500 to-purple-600"
-    },
-    {
-      title: "AI-Powered Search",
-      description: "Find exactly what you're looking for with semantic search that understands context and meaning.",
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
         </svg>
       ),
       color: "from-purple-500 to-pink-600"
     },
     {
-      title: "Smart Highlights",
-      description: "AI automatically identifies and highlights key concepts, important quotes, and relevant sections.",
+      title: "Intelligent Text-to-Speech",
+      description: "Listen to any page with natural voices. Control speed, pitch, and voice selection for a tailored experience.",
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2M7 4a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2M7 4h10M7 8h10M7 12h10M7 16h7" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5l6 3-6 3V5zM5 5v10a4 4 0 004 4h2" />
         </svg>
       ),
       color: "from-pink-500 to-red-600"
     },
     {
-      title: "Rich Annotations",
-      description: "Add notes, comments, and cross-references with AI assistance for better comprehension and retention.",
+      title: "Modern PDF Viewer",
+      description: "Fast, searchable viewer with highlighting and performance optimizations for large documents.",
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2M7 4a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2M7 4h10M7 8h10M7 12h10M7 16h7" />
         </svg>
       ),
-      color: "from-red-500 to-orange-600"
-    },
-    {
-      title: "Customizable Layouts",
-      description: "Personalize your reading experience with themes, fonts, spacing, and layout options that adapt to your preferences.",
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-        </svg>
-      ),
-      color: "from-orange-500 to-yellow-600"
-    },
-    {
-      title: "Cross-Platform Sync",
-      description: "Access your library, notes, and progress seamlessly across all your devices with real-time synchronization.",
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-        </svg>
-      ),
-      color: "from-yellow-500 to-green-600"
+      color: "from-blue-500 to-purple-600"
     }
   ];
 

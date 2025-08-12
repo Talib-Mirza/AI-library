@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import ragService from '../services/RagService';
+import ragService, { QuotaError } from '../services/RagService';
 import bookService from '../services/BookService';
 import type { Book as BookType } from '../services/BookService';
 import type { AskQuestionResponse } from '../services/RagService';
@@ -11,6 +11,7 @@ import '../index.css'; // Import global styles to ensure download button styles 
 import ModernPDFViewer from '../components/pdf/ModernPDFViewer';
 import type { PDFTextSpan } from '../services/OptimizedPDFService';
 import ErrorBoundary from '../components/ErrorBoundary';
+import TTSControls from '../components/TTS/TTSControls';
 
 // Typing animation component
 interface TypingAnimationProps {
@@ -81,6 +82,9 @@ const BookDetailsPage = () => {
   // PDF viewer state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
+  
+  // PDF viewer container ref for TTS
+  const pdfViewerRef = useRef<HTMLDivElement>(null);
   
   // New state for book viewer customization
   const [backgroundColor, setBackgroundColor] = useState('bg-white dark:bg-gray-900');
@@ -220,14 +224,21 @@ const BookDetailsPage = () => {
       setChatMessage('');
       setSelectedText('');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
-      toast.error('Failed to get response from AI. Please try again.');
-      // Add error message to chat
-      setChatHistory([...chatHistory, 
-        { role: 'user', content: chatMessage },
-        { role: 'model', content: "I'm sorry, I encountered an error processing your request. Please try again.", isTyping: true }
-      ]);
+      if (error instanceof QuotaError || error?.response?.status === 402) {
+        toast.error('AI chat limit reached for your plan. Please wait for reset.');
+        setChatHistory([...chatHistory, 
+          { role: 'user', content: chatMessage },
+          { role: 'model', content: "You've reached your AI chat limit for this period. Please wait for reset.", isTyping: true }
+        ]);
+      } else {
+        toast.error('Failed to get response from AI. Please try again.');
+        setChatHistory([...chatHistory, 
+          { role: 'user', content: chatMessage },
+          { role: 'model', content: "I'm sorry, I encountered an error processing your request. Please try again.", isTyping: true }
+        ]);
+      }
     } finally {
       setIsSending(false);
     }
@@ -577,9 +588,26 @@ const BookDetailsPage = () => {
             className="grid grid-cols-1 lg:grid-cols-5 gap-8"
           >
             {/* PDF Viewer - takes 3/5 width on large screens, narrower than before */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-3 space-y-4">
+              {/* TTS Controls */}
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.6 }}
+              >
+                <TTSControls 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  selectedText={selectedText}
+                  viewerContainer={pdfViewerRef.current || undefined}
+                />
+              </motion.div>
+              
               <ErrorBoundary>
-                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/30 overflow-hidden">
+                <div 
+                  ref={pdfViewerRef}
+                  className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/30 overflow-hidden"
+                >
                   <ModernPDFViewer
                     bookId={book.id}
                     onTextSelect={handleTextSelection}

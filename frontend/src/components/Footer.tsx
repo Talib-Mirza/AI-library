@@ -268,7 +268,7 @@ const Footer = () => {
                 </svg>
               </div>
               <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                AI Library
+                Thesyx
               </h3>
             </div>
             <p className="text-gray-300 text-lg leading-relaxed mb-6 max-w-md">
@@ -335,20 +335,20 @@ const Footer = () => {
                 <span className="font-medium">Launch Support:</span>
                 <br />
                 <a 
-                  href="mailto:launch@ailibrary.com" 
+                  href="mailto:launch@thesyx.com" 
                   className="footer-link text-blue-400 hover:text-blue-300 transition-colors duration-200"
                 >
-                  launch@ailibrary.com
+                  launch@thesyx.com
                 </a>
               </p>
               <p className="text-gray-300">
                 <span className="font-medium">Feedback:</span>
                 <br />
                 <a 
-                  href="mailto:feedback@ailibrary.com" 
+                  href="mailto:feedback@thesyx.com" 
                   className="footer-link text-purple-400 hover:text-purple-300 transition-colors duration-200"
                 >
-                  feedback@ailibrary.com
+                  feedback@thesyx.com
                 </a>
               </p>
             </div>
@@ -380,7 +380,7 @@ const Footer = () => {
           className="border-t border-gray-700 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center"
         >
           <div className="text-gray-400 mb-4 md:mb-0">
-            <p>&copy; {currentYear} AI Library. All rights reserved.</p>
+            <p>&copy; {currentYear} Thesyx. All rights reserved.</p>
             <p className="text-sm text-gray-500 mt-1">
               Built with ❤️ for the future of intelligent reading
             </p>

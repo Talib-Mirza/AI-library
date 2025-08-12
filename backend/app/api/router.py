@@ -1,16 +1,21 @@
 from fastapi import APIRouter
 
-from app.api.endpoints import auth, books, config, search, chat, rag#, users, admin, billing
+from app.api.endpoints import auth, books, rag, tts, config
+from app.api.endpoints import billing as billing_endpoints
+from app.api.endpoints import stripe_webhook
+from app.api.endpoints import admin as admin_endpoints
+from app.core.config import settings
 
 api_router = APIRouter()
 
-# Include all endpoint routers
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(books.router, prefix="/books", tags=["books"])
-api_router.include_router(config.router, prefix="/config", tags=["config"])
-api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(rag.router, prefix="/rag", tags=["rag"])
-# api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
-# api_router.include_router(users.router, prefix="/users", tags=["users"])
-# api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
-# api_router.include_router(billing.router, prefix="/billing", tags=["billing"]) 
+api_router.include_router(tts.router, prefix="/tts", tags=["tts"])
+# Only expose config routes in DEBUG
+if settings.DEBUG:
+    api_router.include_router(config.router, prefix="/config", tags=["config"]) 
+
+api_router.include_router(billing_endpoints.router, prefix="/billing", tags=["billing"])
+api_router.include_router(stripe_webhook.router, prefix="/stripe", tags=["stripe"])
+api_router.include_router(admin_endpoints.router, prefix="/admin", tags=["admin"])

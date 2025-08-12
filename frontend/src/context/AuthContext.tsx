@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import api from '../utils/axiosConfig';
 
 interface User {
   id: string;
@@ -8,6 +9,16 @@ interface User {
   full_name: string;
   is_active: boolean;
   is_admin: boolean;
+  bio?: string;
+  location?: string;
+  website?: string;
+  total_files_uploaded: number;
+  total_tts_minutes: number;
+  last_login_at?: string;
+  created_at: string;
+  subscription_status?: string | null;
+  subscription_tier?: string | null;
+  subscription_renewal_at?: string | null;
 }
 
 interface AuthContextType {
@@ -16,7 +27,9 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  googleLogin: (credential: string) => Promise<void>;
   logout: () => void;
+  updateProfile: (profileData: Partial<User> | User) => Promise<void>; // Updated method
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,6 +51,71 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Try refreshing access token periodically
+  useEffect(() => {
+    let refreshTimer: any;
+    const scheduleRefresh = () => {
+      // Refresh a bit before expiry; using 20 minutes as a safe window for a 30-minute access token
+      refreshTimer = setInterval(async () => {
+        const refreshToken = localStorage.getItem('refresh_token');
+        const userId = localStorage.getItem('user_id');
+        if (!refreshToken || !userId) return;
+        try {
+          const res = await fetch('http://localhost:8000/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: Number(userId), refresh_token: refreshToken })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('refresh_token', data.refresh_token);
+          }
+        } catch {}
+      }, 20 * 60 * 1000);
+    };
+    scheduleRefresh();
+    return () => refreshTimer && clearInterval(refreshTimer);
+  }, []);
+
+  // Response interceptor: on 401, try refresh once
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      (resp) => resp,
+      async (error) => {
+        if (error.response?.status === 401) {
+          const refreshToken = localStorage.getItem('refresh_token');
+          const userId = localStorage.getItem('user_id');
+          if (refreshToken && userId) {
+            try {
+              const res = await fetch('http://localhost:8000/api/auth/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: Number(userId), refresh_token: refreshToken })
+              });
+              if (res.ok) {
+                const data = await res.json();
+                localStorage.setItem('token', data.access_token);
+                localStorage.setItem('refresh_token', data.refresh_token);
+                // retry original request
+                error.config.headers.Authorization = `Bearer ${data.access_token}`;
+                return api.request(error.config);
+              }
+            } catch {}
+          }
+          // Hard logout on failure
+          localStorage.removeItem('token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user_id');
+          setUser(null);
+          navigate('/login');
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => api.interceptors.response.eject(interceptor);
+  }, [navigate]);
+
   useEffect(() => {
     // Check if user is already logged in
     const checkAuth = async () => {
@@ -55,13 +133,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           if (response.ok) {
             const userData = await response.json();
             setUser(userData);
+            localStorage.setItem('user_id', String(userData.id));
           } else {
             // If token is invalid, clear it
             localStorage.removeItem('token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user_id');
           }
         } catch (error) {
           console.error('Error checking authentication:', error);
           localStorage.removeItem('token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user_id');
         }
       }
       
@@ -88,11 +171,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
       
       if (!response.ok) {
-        throw new Error('Login failed');
+        let detail = 'Login failed';
+        try {
+          const err = await response.json();
+          if (err?.detail) detail = err.detail;
+        } catch {}
+        throw new Error(detail);
       }
 
       const data = await response.json();
       localStorage.setItem('token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
 
       // Get user data
       const userResponse = await fetch('http://localhost:8000/api/auth/me', {
@@ -107,6 +196,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       const userData = await userResponse.json();
       setUser(userData);
+      localStorage.setItem('user_id', String(userData.id));
       
       // Navigate to dashboard after successful login
       navigate('/dashboard');
@@ -131,12 +221,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
       
       if (!registerResponse.ok) {
-        throw new Error('Registration failed');
+        let detail = 'Registration failed';
+        try {
+          const err = await registerResponse.json();
+          if (err?.detail) detail = err.detail;
+        } catch {}
+        throw new Error(detail);
       }
 
-      // After successful registration, log the user in
-      await login(email, password);
-      // Note: No need to navigate here as login function already handles navigation
+      // NOTE: Do not auto-login here; email verification is required first
+      return;
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -145,24 +239,84 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const googleLogin = async (credential: string) => {
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credential }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Google login failed');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+
+      // Get user data
+      const userResponse = await fetch('http://localhost:8000/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${data.access_token}`
+        }
+      });
+
+      if (!userResponse.ok) {
+        throw new Error('Failed to get user data');
+      }
+
+      const userData = await userResponse.json();
+      setUser(userData);
+      localStorage.setItem('user_id', String(userData.id));
+      
+      // Navigate to dashboard after successful login
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Google login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user_id');
     setUser(null);
     navigate('/login');
   };
 
+  const updateProfile = async (profileData: Partial<User>) => {
+    if (!user) {
+      throw new Error('No user logged in');
+    }
+    try {
+      // Send update to backend
+      const response = await api.put('/auth/profile', {
+        full_name: profileData.full_name,
+        bio: profileData.bio,
+        location: profileData.location,
+        website: profileData.website
+      });
+      setUser(prevUser => prevUser ? { ...prevUser, ...response.data } : null);
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        isAuthenticated: !!user, 
-        isLoading, 
-        login, 
-        register, 
-        logout 
-      }}
-    >
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, googleLogin, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );
-}; 
+};
+
+export default AuthContext;
