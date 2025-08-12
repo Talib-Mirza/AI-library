@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,9 +11,9 @@ interface Book {
   id: number;
   title: string;
   author: string;
-  coverUrl: string;
-  fileType: string;
-  uploadDate: string;
+  coverUrl?: string;
+  fileType?: string;
+  uploadDate?: string;
   tags?: string[];
   filePath?: string;
   userId?: string;
@@ -45,6 +45,7 @@ const itemVariants = {
 
 const DashboardPage = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [books, setBooks] = useState<Book[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -111,6 +112,17 @@ const DashboardPage = () => {
     
     loadBooks();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('verified') === '1') {
+      toast.success('Your email has been verified. Welcome!');
+      // Remove the param from URL without reloading
+      const url = new URL(window.location.href);
+      url.searchParams.delete('verified');
+      window.history.replaceState({}, document.title, url.toString());
+    }
+  }, [location.search]);
   
   const filteredBooks = books.filter(book => {
     // First filter by category if not 'all'
@@ -202,9 +214,14 @@ const DashboardPage = () => {
       
       toast.success('Book uploaded successfully!');
       closeModal();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading book:', error);
-      toast.error('Failed to upload book. Please try again.');
+      if (error?.response?.status === 402) {
+        const detail = error.response?.data?.detail || 'Upload limit reached for your plan. Please wait for reset.';
+        toast.error(detail);
+      } else {
+        toast.error('Failed to upload book. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1077,7 +1094,7 @@ const BookCard = ({ book, onDelete, onEdit }: BookProps) => {
             <svg className="w-3 h-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <span>Added {new Date(book.uploadDate).toLocaleDateString()}</span>
+            <span>Added {book.uploadDate ? new Date(book.uploadDate).toLocaleDateString() : ''}</span>
           </div>
           
           {/* Tags */}

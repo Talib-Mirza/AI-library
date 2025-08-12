@@ -303,8 +303,7 @@ const CTASection = () => {
           ref={subtitleRef}
           className="text-xl md:text-2xl lg:text-3xl mb-12 text-gray-300 max-w-4xl mx-auto leading-relaxed"
         >
-          Join our launch community and get exclusive early access to the revolutionary AI library platform. 
-          Experience the future of intelligent document interaction—completely free during our launch phase.
+          Explore Thesyx: AI chat for your documents and intelligent text-to-speech in a modern reading experience.
         </p>
 
         {/* Action Buttons */}
@@ -316,7 +315,7 @@ const CTASection = () => {
           >
             <div className="glow absolute -inset-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full blur-lg opacity-30 group-hover:opacity-100 transition-all duration-300" />
             <div className="relative px-12 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white text-xl font-bold rounded-full transition-all duration-300 hover:shadow-2xl">
-              {isAuthenticated ? "Enter Dashboard" : "Start Free Today"}
+              {isAuthenticated ? "Enter Dashboard" : "Get Started"}
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </div>
           </Link>
@@ -333,7 +332,7 @@ const CTASection = () => {
           </Link>
         </div>
 
-        {/* Launch Features */}
+        {/* Highlights */}
         <div 
           ref={featuresRef}
           className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16"
@@ -344,8 +343,8 @@ const CTASection = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Launch Day Special</h3>
-            <p className="text-gray-300">Free premium features for all early adopters during our launch period</p>
+            <h3 className="text-xl font-bold text-white mb-2">AI Answers</h3>
+            <p className="text-gray-300">Ask questions about your PDFs and get grounded, page-aware responses</p>
           </div>
 
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
@@ -354,8 +353,8 @@ const CTASection = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Lightning Fast Setup</h3>
-            <p className="text-gray-300">Get started in under 60 seconds—no complex configuration required</p>
+            <h3 className="text-xl font-bold text-white mb-2">Quick Setup</h3>
+            <p className="text-gray-300">Upload a PDF and start chatting or listening within seconds</p>
           </div>
 
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
@@ -364,40 +363,12 @@ const CTASection = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Shape the Future</h3>
-            <p className="text-gray-300">Your feedback helps us build the perfect AI reading experience</p>
+            <h3 className="text-xl font-bold text-white mb-2">TTS Controls</h3>
+            <p className="text-gray-300">Fine-tune speed, pitch, and voice for comfortable listening</p>
           </div>
         </div>
 
-        {/* Launch Stats */}
-        <div 
-          ref={statsRef}
-          className="grid grid-cols-2 md:grid-cols-4 gap-8"
-        >
-          <div className="text-center">
-            <div className="stat-number text-4xl md:text-5xl font-black bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent" data-target="0">0</div>
-            <div className="text-gray-400 text-sm md:text-base">Early Adopters</div>
-            <div className="text-xs text-gray-500 mt-1">Join the first wave!</div>
-          </div>
-          
-          <div className="text-center">
-            <div className="stat-number text-4xl md:text-5xl font-black bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent" data-target="100">0</div>
-            <div className="text-gray-400 text-sm md:text-base">% Free Features</div>
-            <div className="text-xs text-gray-500 mt-1">During launch</div>
-          </div>
-          
-          <div className="text-center">
-            <div className="stat-number text-4xl md:text-5xl font-black bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent" data-target="60">0</div>
-            <div className="text-gray-400 text-sm md:text-base">Second Setup</div>
-            <div className="text-xs text-gray-500 mt-1">Quick start</div>
-          </div>
-          
-          <div className="text-center">
-            <div className="stat-number text-4xl md:text-5xl font-black bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent" data-target="24">0</div>
-            <div className="text-gray-400 text-sm md:text-base">Hour Support</div>
-            <div className="text-xs text-gray-500 mt-1">Launch period</div>
-          </div>
-        </div>
+        {/* Removed stats block */}
 
         {/* Launch Badge */}
         <div className="mt-12 inline-flex items-center space-x-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-400/30 px-6 py-3 rounded-full">

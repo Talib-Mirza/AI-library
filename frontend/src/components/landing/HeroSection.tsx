@@ -1,209 +1,125 @@
-import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-
-gsap.registerPlugin(ScrollTrigger);
 
 const HeroSection = () => {
   const { isAuthenticated } = useAuth();
-  const heroRef = useRef<HTMLDivElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const subtitleRef = useRef<HTMLParagraphElement>(null);
-  const buttonsRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (!heroRef.current || !titleRef.current || !subtitleRef.current || !buttonsRef.current) return;
-
-    const hero = heroRef.current;
-    const title = titleRef.current;
-    const subtitle = subtitleRef.current;
-    const buttons = buttonsRef.current;
-    const overlay = overlayRef.current;
-
-    // Initial animation on load
-    const tl = gsap.timeline();
-    
-    tl.fromTo(overlay, 
-      { opacity: 0.8 },
-      { opacity: 0.4, duration: 2, ease: "power2.out" }
-    )
-    .fromTo(title, 
-      { scale: 0.8, opacity: 0, y: 50 },
-      { scale: 1, opacity: 1, y: 0, duration: 1.2, ease: "back.out(1.7)" }, 
-      "-=1.5"
-    )
-    .fromTo(subtitle, 
-      { opacity: 0, y: 30 },
-      { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" }, 
-      "-=0.6"
-    )
-    .fromTo(buttons, 
-      { opacity: 0, y: 30 },
-      { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" }, 
-      "-=0.4"
-    );
-
-    // Scroll-triggered animations
-    // Dynamic title font size animation
-    ScrollTrigger.create({
-      trigger: hero,
-      start: "top top",
-      end: "bottom top",
-      scrub: true,
-      onUpdate: (self) => {
-        const progress = self.progress;
-        const scale = 1 + (progress * 0.3); // Grows as user scrolls
-        const opacity = 1 - (progress * 0.7);
-        
-        gsap.set(title, {
-          scale: scale,
-          opacity: opacity,
-          transformOrigin: "center center"
-        });
-        
-        gsap.set(subtitle, {
-          opacity: opacity
-        });
-        
-        gsap.set(buttons, {
-          opacity: opacity
-        });
-      }
-    });
-
-    // Parallax effect for the overlay text
-    ScrollTrigger.create({
-      trigger: hero,
-      start: "top top",
-      end: "bottom top",
-      scrub: true,
-      onUpdate: (self) => {
-        const progress = self.progress;
-        const y = progress * 100;
-        const x = Math.sin(progress * Math.PI) * 20; // Slight horizontal pan
-        
-        gsap.set([title, subtitle, buttons], {
-          y: y,
-          x: x,
-        });
-      }
-    });
-
-    return () => {
-      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
-    };
-  }, []);
 
   return (
-    <section ref={heroRef} className="relative h-screen flex items-center justify-center overflow-hidden">
-      {/* Background Video */}
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        loop
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-      >
-        <source src="/videos/2268807-hd_1920_1080_24fps.mp4" type="video/mp4" />
-      </video>
-      
-      {/* Video Overlay */}
-      <div 
-        ref={overlayRef}
-        className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-purple-900/50"
-      ></div>
-      
-      {/* Content */}
-      <div className="relative z-10 text-center text-white px-8 md:px-16 lg:px-24 w-full">
-        <h1 
-          ref={titleRef}
-          className="text-5xl md:text-7xl lg:text-8xl font-black mb-6 leading-tight"
-          style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #e0e7ff 50%, #c7d2fe 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            textShadow: '0 0 40px rgba(255,255,255,0.3)'
-          }}
-        >
-          AI-Powered
-          <br />
-          <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-blue-300 bg-clip-text text-transparent">
-            Library
-          </span>
-        </h1>
-        
-        <p 
-          ref={subtitleRef}
-          className="text-xl md:text-2xl lg:text-3xl mb-10 text-gray-200 max-w-4xl mx-auto leading-relaxed font-light"
-        >
-          Transform your reading experience with intelligent conversations, 
-          seamless document management, and AI-powered insights that bring your books to life.
-        </p>
-        
-        <div ref={buttonsRef} className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-          {isAuthenticated ? (
-            <Link
-              to="/dashboard"
-              className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-lg font-semibold rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl overflow-hidden"
-            >
-              <span className="relative z-10">Go to Dashboard</span>
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full blur opacity-30 group-hover:opacity-100 transition duration-300"></div>
-            </Link>
-          ) : (
-            <>
-              <Link
-                to="/register"
-                className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-lg font-semibold rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-2xl overflow-hidden"
-              >
-                <span className="relative z-10">Get Started Free</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full blur opacity-30 group-hover:opacity-100 transition duration-300"></div>
-              </Link>
-              
-              <Link
-                to="/login"
-                className="group relative px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white text-lg font-semibold rounded-full transition-all duration-300 transform hover:scale-105 hover:bg-white/20 hover:shadow-2xl"
-              >
-                <span className="relative z-10">Sign In</span>
-                <div className="absolute inset-0 bg-white/5 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-full"></div>
-              </Link>
-            </>
-          )}
-        </div>
-        
-
+    <section className="relative min-h-[105vh] flex items-center overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 dark:from-black dark:via-slate-950 dark:to-black">
+      {/* Background effects */}
+      <div className="pointer-events-none absolute inset-0">
+        {/* Soft radial glow */}
+        <div className="absolute -top-24 -left-24 h-[38rem] w-[38rem] rounded-full bg-gradient-to-br from-blue-600/20 to-purple-600/20 blur-3xl" />
+        <div className="absolute top-1/3 -right-40 h-[34rem] w-[34rem] rounded-full bg-gradient-to-tr from-fuchsia-500/10 to-cyan-500/10 blur-3xl" />
+        {/* Grid overlay */}
+        <svg className="absolute inset-0 w-full h-full opacity-[0.07]" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+              <path d="M 32 0 L 0 0 0 32" fill="none" stroke="currentColor" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+        </svg>
       </div>
-      
-      {/* Floating elements */}
-      <div className="absolute top-1/4 left-10 w-4 h-4 bg-blue-400/30 rounded-full animate-pulse"></div>
-      <div className="absolute top-1/3 right-16 w-6 h-6 bg-purple-400/30 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
-      <div className="absolute bottom-1/4 left-1/4 w-3 h-3 bg-white/30 rounded-full animate-pulse" style={{ animationDelay: '2s' }}></div>
-      <div className="absolute bottom-1/3 right-1/4 w-5 h-5 bg-blue-300/30 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
-      
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white/60 z-20">
-        <div className="flex flex-col items-center space-y-2 animate-bounce">
-          <span className="text-sm font-light">Scroll to explore</span>
-          <svg 
-            className="w-6 h-6" 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
+
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-10 lg:px-14 py-24 lg:py-32">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          {/* Left: Text */}
+          <div>
+            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0, duration: 0.7 }}>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-300 dark:text-gray-200">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                Experience AI chat + Text‑to‑Speech
+              </div>
+            </motion.div>
+
+            <motion.h1
+              className="mt-6 text-4xl md:text-6xl lg:text-7xl font-black tracking-tight bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15, duration: 0.7 }}
+            >
+              Read Smarter. Ask Faster. Listen Effortlessly.
+            </motion.h1>
+
+            <motion.p
+              className="mt-6 max-w-2xl text-lg md:text-xl text-gray-300/90 leading-relaxed"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.7 }}
+            >
+              Thesyx transforms PDFs into interactive knowledge. Ask grounded questions about your documents and listen with intelligent, natural TTS—optimized for focus and speed.
+            </motion.p>
+
+            <motion.div
+              className="mt-10 flex flex-col sm:flex-row items-center gap-4"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45, duration: 0.7 }}
+            >
+              <Link
+                to={isAuthenticated ? '/dashboard' : '/register'}
+                className="group relative inline-flex items-center justify-center rounded-xl px-6 py-3 text-white font-semibold bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-700/20 transition-transform duration-200 hover:scale-[1.03]"
+              >
+                <span className="relative z-10">{isAuthenticated ? 'Enter Dashboard' : 'Get Started'}</span>
+                <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+              </Link>
+
+              <Link
+                to="/use-cases"
+                className="inline-flex items-center justify-center rounded-xl px-6 py-3 border border-white/15 text-gray-200 hover:text-white bg-white/5 hover:bg-white/10 transition-colors duration-200"
+              >
+                Learn More
+              </Link>
+            </motion.div>
+          </div>
+
+          {/* Right: Abstract visual */}
+          <motion.div
+            className="relative order-first lg:order-last"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35, duration: 0.8 }}
           >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2} 
-              d="M19 14l-7 7m0 0l-7-7m7 7V3" 
-            />
-          </svg>
+            <div className="relative mx-auto h-[320px] w-[320px] md:h-[420px] md:w-[420px] lg:h-[480px] lg:w-[480px]">
+              {/* Concentric glow */}
+              <div className="absolute inset-0 rounded-[2rem] bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-emerald-500/20 blur-2xl" />
+              {/* Core card */}
+              <div className="relative h-full w-full rounded-[2rem] bg-gradient-to-b from-slate-800/80 to-slate-900/80 border border-white/10 backdrop-blur-xl shadow-2xl overflow-hidden">
+                {/* Animated mesh lines */}
+                <svg className="absolute inset-0 w-full h-full opacity-20" viewBox="0 0 600 600">
+                  <defs>
+                    <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#60A5FA" />
+                      <stop offset="100%" stopColor="#A78BFA" />
+                    </linearGradient>
+                  </defs>
+                  <g fill="none" stroke="url(#lg)" strokeWidth="1">
+                    {Array.from({ length: 18 }).map((_, i) => (
+                      <path key={i} d={`M0 ${i * 34} C 150 ${i * 34 + (i % 2 ? 24 : -24)}, 450 ${i * 34 + (i % 2 ? -24 : 24)}, 600 ${i * 34}`} />
+                    ))}
+                  </g>
+                </svg>
+                {/* Floating dots */}
+                <div className="absolute inset-0">
+                  {Array.from({ length: 14 }).map((_, i) => (
+                    <motion.span
+                      key={i}
+                      className="absolute h-2 w-2 rounded-full bg-gradient-to-br from-blue-400 to-purple-400"
+                      style={{ top: `${Math.random() * 90 + 5}%`, left: `${Math.random() * 90 + 5}%` }}
+                      animate={{ y: [0, -6, 0] }}
+                      transition={{ duration: 2 + Math.random() * 2, repeat: Infinity, ease: 'easeInOut', delay: Math.random() * 1.2 }}
+                    />
+                  ))}
+                </div>
+                {/* Caption */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 text-center text-sm text-gray-300/80 bg-gradient-to-t from-black/30 to-transparent">
+                  Modern PDF + AI chat + TTS
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
     </section>

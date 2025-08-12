@@ -4,7 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
+    <title>Thesyx - Your Smart Reading Companion</title>
+    
+    <!-- Google Identity Services - Required by Google documentation -->
+    <script src="https://accounts.google.com/gsi/client" async></script>
+    
+    <!-- Content Security Policy - Recommended by Google for security -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com/gsi/client;
+      style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style;
+      frame-src 'self' https://accounts.google.com/gsi/;
+      connect-src 'self' blob: data: http://localhost:8000 https://accounts.google.com/gsi/;
+      img-src 'self' data: blob:;
+      font-src 'self' data:;
+      media-src 'self' blob: data:;
+      worker-src 'self' blob:;
+    ">
+    
+    <!-- Cross-Origin-Opener-Policy - Required for popups (unsafe-none for Google OAuth) -->
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="unsafe-none">
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="unsafe-none">
   </head>
   <body>
     <div id="root"></div>

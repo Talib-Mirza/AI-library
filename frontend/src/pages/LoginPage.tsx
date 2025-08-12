@@ -4,12 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import gsap from 'gsap';
 import { motion } from 'framer-motion';
+import GoogleOAuthButton from '../components/auth/GoogleOAuthButton';
+import api from '../utils/axiosConfig';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [unverified, setUnverified] = useState(false);
+  const [resending, setResending] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -88,11 +92,30 @@ const LoginPage = () => {
       // Redirect to the page they tried to visit or dashboard
       const from = location.state?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      toast.error('Failed to login. Please check your credentials.');
+      const message = error?.message || '';
+      if (message.includes('Email not verified')) {
+        setUnverified(true);
+        toast.error('Email not verified. Check your inbox or resend the verification email.');
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+      } else {
+        toast.error('Failed to login. Please check your credentials.');
+      }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    try {
+      setResending(true);
+      await api.post('/auth/resend-verification');
+      toast.success('Verification email sent. Please check your inbox.');
+    } catch (e) {
+      toast.error('Failed to resend verification email.');
+    } finally {
+      setResending(false);
     }
   };
   
@@ -122,7 +145,7 @@ const LoginPage = () => {
           <h1 ref={titleRef} className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-purple-100 mb-2">
             Welcome Back
           </h1>
-          <p className="text-gray-400 text-lg">Sign in to your AI Library account</p>
+          <p className="text-gray-400 text-lg">Sign in to your Thesyx account</p>
         </div>
         
         {/* Form Container */}
@@ -191,13 +214,13 @@ const LoginPage = () => {
                 </div>
                 
                 <div className="text-sm">
-                  <a 
-                    href="#" 
+                  <Link 
+                    to="/forgot-password" 
                     className="text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200 relative group"
                   >
                     Forgot password?
                     <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-400 group-hover:w-full transition-all duration-300"></span>
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -225,6 +248,26 @@ const LoginPage = () => {
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
             </motion.button>
+
+            {/* Divider */}
+            <div className="relative flex items-center justify-center py-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-600/30"></div>
+              </div>
+              <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 px-4">
+                <span className="text-sm text-gray-400 font-medium">OR</span>
+              </div>
+            </div>
+
+            {/* Google OAuth Button */}
+            <GoogleOAuthButton 
+              onSuccess={() => {
+                console.log('Google OAuth login success');
+              }}
+              onError={(error) => {
+                console.error('Google OAuth login error:', error);
+              }}
+            />
           </form>
           
           {/* Divider */}
@@ -234,7 +277,7 @@ const LoginPage = () => {
             </div>
             <div className="relative flex justify-center text-sm">
               <span className="px-4 bg-gray-800/50 text-gray-400 rounded-full backdrop-blur-sm">
-                New to AI Library?
+                New to Thesyx?
               </span>
             </div>
           </div>
@@ -280,6 +323,15 @@ const LoginPage = () => {
             </div>
           </div>
         </motion.div>
+
+        {unverified && (
+          <div className="mt-2 text-sm text-gray-300">
+            Didn’t get the email?{' '}
+            <button type="button" onClick={handleResend} disabled={resending} className="text-blue-400 hover:text-blue-300 font-medium">
+              {resending ? 'Sending…' : 'Resend verification email'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

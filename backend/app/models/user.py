@@ -17,10 +17,23 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
+    # Profile information
+    profile_picture_url = Column(String(500), nullable=True)  # URL to profile picture
+    bio = Column(Text, nullable=True)  # User bio/description
+    location = Column(String(255), nullable=True)  # User location
+    website = Column(String(255), nullable=True)  # User website
+    
+    # Usage statistics
+    total_files_uploaded = Column(Integer, default=0, nullable=False)
+    total_tts_minutes = Column(Integer, default=0, nullable=False)  # Total TTS usage in minutes
+    total_ai_queries = Column(Integer, default=0, nullable=False)  # Total AI chat queries across books
+    last_login_at = Column(DateTime, nullable=True)
+    
     # Stripe subscription information
     stripe_customer_id = Column(String(255), nullable=True)
     subscription_status = Column(String(50), nullable=True)  # active, trialing, past_due, canceled, etc.
     subscription_tier = Column(String(50), nullable=True)  # basic, premium, etc.
+    subscription_renewal_at = Column(DateTime, nullable=True)  # Next renewal datetime (UTC)
     
     # Dates
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.services.user import UserService
+from app.services.usage_service import usage_service
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -44,19 +45,23 @@ async def get_current_user(
     try:
         # Decode the token
         payload = decode_token(token)
+        
         email: str = payload.get("sub")
         user_id: int = payload.get("user_id")
         token_type: str = payload.get("type")
         
         # Basic validation
         if email is None or user_id is None:
+            print(f"❌ JWT validation failed - Email: {email}, User ID: {user_id}")
             raise credentials_exception
         
         # Check if token is an access token
         if token_type != "access":
+            print(f"❌ JWT validation failed - Wrong token type: {token_type}")
             raise credentials_exception
     
-    except JWTError:
+    except JWTError as e:
+        print(f"❌ JWT decode error: {e}")
         raise credentials_exception
     
     # Get the user from the database
@@ -139,3 +144,18 @@ async def get_current_active_subscriber(current_user: User = Depends(get_current
         )
     
     return current_user 
+
+async def require_within_ai_query_quota(current_user: User = Depends(get_current_user)):
+    within = await usage_service.is_within_limit(current_user, 'ai_queries')
+    if not within:
+        raise HTTPException(status_code=402, detail='AI query limit reached. Upgrade to Pro to continue.')
+
+async def require_within_tts_quota(current_user: User = Depends(get_current_user)):
+    within = await usage_service.is_within_limit(current_user, 'tts_minutes')
+    if not within:
+        raise HTTPException(status_code=402, detail='TTS minutes limit reached. Upgrade to Pro to continue.')
+
+async def require_within_upload_quota(current_user: User = Depends(get_current_user)):
+    within = await usage_service.is_within_limit(current_user, 'book_uploads')
+    if not within:
+        raise HTTPException(status_code=402, detail='Book uploads limit reached. Upgrade to Pro to continue.') 

@@ -12,9 +12,12 @@
   -webkit-user-select: text;
   -moz-user-select: text;
   -ms-user-select: text;
+  z-index: 10;
+  pointer-events: auto;
 }
 
-.textLayer > span {
+.textLayer > span,
+.textLayer > div {
   color: transparent;
   position: absolute;
   white-space: pre;
@@ -24,29 +27,48 @@
   -webkit-user-select: text;
   -moz-user-select: text;
   -ms-user-select: text;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
 }
 
-/* Hover highlighting for text chunks */
-.textLayer .hover-highlight {
-  background-color: rgba(59, 130, 246, 0.2) !important;
-  border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3);
-  transition: background-color 0.15s ease-in-out;
+/* Native text selection highlighting */
+.textLayer span::selection {
+  background: rgba(0, 123, 255, 0.3);
+  color: transparent;
 }
 
+.textLayer span::-moz-selection {
+  background: rgba(0, 123, 255, 0.3);
+  color: transparent;
+}
+
+.textLayer div::selection {
+  background: rgba(0, 123, 255, 0.3);
+  color: transparent;
+}
+
+.textLayer div::-moz-selection {
+  background: rgba(0, 123, 255, 0.3);
+  color: transparent;
+}
+
+/* Search result highlighting */
 .textLayer .highlight {
   margin: -1px;
   padding: 1px;
-  background-color: rgba(180, 0, 255, 0.2);
-  border-radius: 4px;
+  background-color: rgba(255, 230, 102, 0.6);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 193, 7, 0.8);
 }
 
 .textLayer .highlight.begin {
-  border-radius: 4px 0px 0px 4px;
+  border-radius: 2px 0px 0px 2px;
 }
 
 .textLayer .highlight.end {
-  border-radius: 0px 4px 4px 0px;
+  border-radius: 0px 2px 2px 0px;
 }
 
 .textLayer .highlight.middle {
@@ -54,14 +76,5 @@
 }
 
 .textLayer .highlight.selected {
-  background-color: rgba(0, 100, 255, 0.2);
-}
-
-/* Text selection highlighting */
-.textLayer span::selection {
-  background: rgba(0, 100, 255, 0.3);
-}
-
-.textLayer span::-moz-selection {
-  background: rgba(0, 100, 255, 0.3);
+  background-color: rgba(255, 193, 7, 0.8);
 } 

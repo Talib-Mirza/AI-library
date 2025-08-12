@@ -44,20 +44,32 @@ class FAISSRAGService:
                 logger.error("OpenAI API key not found in settings")
                 return False
                 
+            logger.info("Initializing FAISS RAG with OpenAI API key")
+                
             # Initialize OpenAI embeddings
-            self.embeddings = OpenAIEmbeddings(
-                openai_api_key=settings.OPENAI_API_KEY,
-                model="text-embedding-3-small"  # Fast and cost-effective
-            )
+            try:
+                self.embeddings = OpenAIEmbeddings(
+                    openai_api_key=settings.OPENAI_API_KEY,
+                    model="text-embedding-3-small"  # Fast and cost-effective
+                )
+                logger.info("OpenAI embeddings initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenAI embeddings: {e}")
+                return False
             
             # Initialize chat model
-            self.chat_model = ChatOpenAI(
-                openai_api_key=settings.OPENAI_API_KEY,
-                model="gpt-4o-mini",  # Cost-effective but capable
-                temperature=0,
-                max_tokens=1000
-            )
-            
+            try:
+                self.chat_model = ChatOpenAI(
+                    openai_api_key=settings.OPENAI_API_KEY,
+                    model="gpt-4o-mini",  # Cost-effective but capable
+                    temperature=0,
+                    max_tokens=1000
+                )
+                logger.info("OpenAI chat model initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenAI chat model: {e}")
+                return False
+                
             # Configure text splitter
             self.text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=1000,
@@ -240,6 +252,10 @@ class FAISSRAGService:
             logger.error("Cannot ask question: Service not initialized")
             return {"error": "Service not initialized"}
             
+        if not self.chat_model:
+            logger.error("Cannot ask question: Chat model not initialized")
+            return {"error": "Chat model not initialized"}
+            
         try:
             # Load the vector store
             vector_store = self._load_vector_store(document_id)
@@ -254,8 +270,8 @@ class FAISSRAGService:
             
             # Use modern LCEL approach for better compatibility
             try:
-                # Get relevant documents
-                docs = retriever.get_relevant_documents(question)
+                # Get relevant documents using invoke method (replaces deprecated get_relevant_documents)
+                docs = retriever.invoke(question)
                 
                 if not docs:
                     return {"error": "No relevant documents found for the question"}
@@ -287,22 +303,50 @@ class FAISSRAGService:
                 
                 context = "\n\n".join(context_parts)
                 
-                # Create a simple prompt string directly (avoid PromptTemplate issues)
-                simple_prompt = f"""Use the following pieces of context to answer the question at the end. If you don't know the answer based on the context provided, just say that you don't know, don't try to make up an answer.
+                # Create a comprehensive and helpful prompt
+                simple_prompt = f"""You are an AI assistant that helps users understand and discuss their uploaded content. The user has uploaded a document/book/file/PDF, and you should help them explore and understand it.
 
-Context:
+GUIDELINES:
+- When users ask about "this book", "this document", "this file", "this PDF", or similar terms, they're referring to their uploaded content
+- Be helpful and informative about the content based on the context provided
+- Provide summaries, answer questions, explain concepts, and help users understand the material
+- If the question is completely unrelated to the uploaded content (like asking about weather, cooking recipes when the document is about finance, etc.), politely redirect them to ask about their document
+- If you don't have enough information in the context to answer a specific question, say so and suggest they might need to ask about a different section or provide more specific details
+- Be conversational and helpful - don't just say "I don't know" unless the question is truly impossible to answer from the content
+
+CONTEXT FROM THE UPLOADED CONTENT:
 {context}
 
-Question: {question}
+USER QUESTION: {question}
 
-Answer:"""
+HELPFUL RESPONSE:"""
                 
                 # Get answer from chat model using invoke method
                 try:
-                    answer = self.chat_model.invoke(simple_prompt).content
+                    if not self.chat_model:
+                        logger.error("Chat model is None - initialization may have failed")
+                        raise Exception("Chat model is not initialized")
+                        
+                    response = self.chat_model.invoke(simple_prompt)
+                    answer = response.content if hasattr(response, 'content') else str(response)
+                    logger.info("Chat model invoke succeeded")
                 except Exception as invoke_error:
-                    logger.warning(f"Invoke method failed, trying predict: {invoke_error}")
-                    answer = self.chat_model.predict(simple_prompt)
+                    logger.warning(f"Invoke method failed: {invoke_error}")
+                    # Fallback to basic string formatting
+                    try:
+                        if not self.chat_model:
+                            raise Exception("Chat model is None")
+                            
+                        # Create a simple message format that most models accept
+                        from langchain.schema import HumanMessage
+                        messages = [HumanMessage(content=simple_prompt)]
+                        response = self.chat_model.invoke(messages)
+                        answer = response.content if hasattr(response, 'content') else str(response)
+                        logger.info("Chat model invoke with HumanMessage succeeded")
+                    except Exception as message_error:
+                        logger.error(f"Both invoke methods failed: {message_error}")
+                        # Final fallback - use basic string
+                        answer = f"I'm having trouble processing your question right now. Chat model error: {message_error}"
                 
                 return {
                     "answer": answer,
@@ -317,7 +361,7 @@ Answer:"""
                 # Ultra-simple fallback approach
                 try:
                     # Direct retrieval without complex formatting
-                    docs = retriever.get_relevant_documents(question)
+                    docs = retriever.invoke(question)
                     if not docs:
                         return {"error": "No relevant documents found"}
                     
@@ -367,7 +411,7 @@ Answer:"""
         """
         try:
             # Get documents using retriever
-            docs = retriever.get_relevant_documents(question)
+            docs = retriever.invoke(question)
             if not docs:
                 return {"error": "No relevant documents found"}
             

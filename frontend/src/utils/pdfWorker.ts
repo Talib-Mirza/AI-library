@@ -1,108 +1,31 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
+let workerReady = false;
+
 // Custom worker setup function
 export const setupPDFWorker = async (): Promise<void> => {
+  const DEBUG = import.meta.env?.MODE === 'development';
   try {
-    console.log('[PDFWorker] Setting up PDF.js worker...');
-    
-    // Strategy 1: Use local worker file that Vite copies
+    if (DEBUG) console.debug('[PDFWorker] Setting up PDF.js worker...');
+
+    // Use local worker file that Vite copies (most reliable)
     const localWorkerPath = '/pdfjs/pdf.worker.min.js';
-    
-    try {
-      // Test if local worker is available
-      const response = await fetch(localWorkerPath, { method: 'HEAD' });
-      if (response.ok) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = localWorkerPath;
-        console.log(`[PDFWorker] Using local worker at: ${localWorkerPath}`);
-        
-        // Test the worker by creating a minimal PDF document
-        await testWorker();
-        console.log('[PDFWorker] Local worker test successful');
-        return;
-      }
-    } catch (localError) {
-      console.warn('[PDFWorker] Local worker not available:', localError);
-    }
-    
-    // Strategy 2: Use CDN fallbacks in order of preference
-    const cdnStrategies = [
-      `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`,
-      `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
-      `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
-    ];
-    
-    for (const workerUrl of cdnStrategies) {
-      try {
-        console.log(`[PDFWorker] Trying CDN: ${workerUrl}`);
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
-        
-        // Test the worker
-        await testWorker();
-        console.log(`[PDFWorker] CDN worker successful: ${workerUrl}`);
-        return;
-      } catch (cdnError) {
-        console.warn(`[PDFWorker] CDN failed: ${workerUrl}`, cdnError);
-      }
-    }
-    
-    // Strategy 3: Create inline worker with dynamic import
-    try {
-      console.log('[PDFWorker] Trying inline worker with dynamic import');
-      const workerCode = `
-        import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js')
-          .catch(() => import('https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js'))
-          .catch(() => import('https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js'));
-      `;
-      
-      const blob = new Blob([workerCode], { type: 'application/javascript' });
-      pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
-      
-      await testWorker();
-      console.log('[PDFWorker] Inline worker successful');
-      return;
-    } catch (inlineError) {
-      console.warn('[PDFWorker] Inline worker failed:', inlineError);
-    }
-    
-    throw new Error('All worker strategies failed');
-    
+
+    // Set worker src unconditionally; the file is served from public/
+    pdfjsLib.GlobalWorkerOptions.workerSrc = localWorkerPath;
+    workerReady = true;
+    if (DEBUG) console.debug(`[PDFWorker] Using local worker at: ${localWorkerPath}`);
+    return;
   } catch (error) {
     console.error('[PDFWorker] Worker setup failed:', error);
-    
-    // Final fallback: disable worker entirely
-    console.log('[PDFWorker] Disabling worker, using main thread');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-    throw error;
   }
+  
+  // Final fallback: disable worker entirely (use main thread)
+  if (DEBUG) console.debug('[PDFWorker] Using main thread processing (no worker)');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+  workerReady = false;
 };
 
-// Test worker by loading a minimal PDF
-async function testWorker(): Promise<void> {
-  const testData = new Uint8Array([
-    0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x0a, // PDF-1.4 header
-    0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a, // Binary marker
-    0x31, 0x20, 0x30, 0x20, 0x6f, 0x62, 0x6a, 0x0a, // 1 0 obj
-    0x3c, 0x3c, 0x2f, 0x54, 0x79, 0x70, 0x65, 0x2f, 0x43, 0x61, 0x74, 0x61, 0x6c, 0x6f, 0x67, 0x2f, 0x50, 0x61, 0x67, 0x65, 0x73, 0x20, 0x32, 0x20, 0x30, 0x20, 0x52, 0x3e, 0x3e, 0x0a, // <</Type/Catalog/Pages 2 0 R>>
-    0x65, 0x6e, 0x64, 0x6f, 0x62, 0x6a, 0x0a, // endobj
-    0x32, 0x20, 0x30, 0x20, 0x6f, 0x62, 0x6a, 0x0a, // 2 0 obj
-    0x3c, 0x3c, 0x2f, 0x54, 0x79, 0x70, 0x65, 0x2f, 0x50, 0x61, 0x67, 0x65, 0x73, 0x2f, 0x4b, 0x69, 0x64, 0x73, 0x5b, 0x33, 0x20, 0x30, 0x20, 0x52, 0x5d, 0x2f, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x20, 0x31, 0x3e, 0x3e, 0x0a, // <</Type/Pages/Kids[3 0 R]/Count 1>>
-    0x65, 0x6e, 0x64, 0x6f, 0x62, 0x6a, 0x0a, // endobj
-    0x33, 0x20, 0x30, 0x20, 0x6f, 0x62, 0x6a, 0x0a, // 3 0 obj
-    0x3c, 0x3c, 0x2f, 0x54, 0x79, 0x70, 0x65, 0x2f, 0x50, 0x61, 0x67, 0x65, 0x2f, 0x50, 0x61, 0x72, 0x65, 0x6e, 0x74, 0x20, 0x32, 0x20, 0x30, 0x20, 0x52, 0x2f, 0x4d, 0x65, 0x64, 0x69, 0x61, 0x42, 0x6f, 0x78, 0x5b, 0x30, 0x20, 0x30, 0x20, 0x36, 0x31, 0x32, 0x20, 0x37, 0x39, 0x32, 0x5d, 0x3e, 0x3e, 0x0a, // <</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>
-    0x65, 0x6e, 0x64, 0x6f, 0x62, 0x6a, 0x0a, // endobj
-    0x78, 0x72, 0x65, 0x66, 0x0a, 0x30, 0x20, 0x34, 0x0a, // xref
-    0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x20, 0x36, 0x35, 0x35, 0x33, 0x35, 0x20, 0x66, 0x20, 0x0a, // 0000000000 65535 f
-    0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x39, 0x20, 0x30, 0x30, 0x30, 0x30, 0x30, 0x20, 0x6e, 0x20, 0x0a, // 0000000009 00000 n
-    0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x37, 0x34, 0x20, 0x30, 0x30, 0x30, 0x30, 0x30, 0x20, 0x6e, 0x20, 0x0a, // 0000000074 00000 n
-    0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x31, 0x32, 0x33, 0x20, 0x30, 0x30, 0x30, 0x30, 0x30, 0x20, 0x6e, 0x20, 0x0a, // 0000000123 00000 n
-    0x74, 0x72, 0x61, 0x69, 0x6c, 0x65, 0x72, 0x0a, 0x3c, 0x3c, 0x2f, 0x53, 0x69, 0x7a, 0x65, 0x20, 0x34, 0x2f, 0x52, 0x6f, 0x6f, 0x74, 0x20, 0x31, 0x20, 0x30, 0x20, 0x52, 0x3e, 0x3e, 0x0a, // trailer <</Size 4/Root 1 0 R>>
-    0x73, 0x74, 0x61, 0x72, 0x74, 0x78, 0x72, 0x65, 0x66, 0x0a, 0x32, 0x31, 0x33, 0x0a, 0x25, 0x25, 0x45, 0x4f, 0x46 // startxref 213 %%EOF
-  ]);
-  
-  const loadingTask = pdfjsLib.getDocument({ data: testData });
-  const testDoc = await loadingTask.promise;
-  await testDoc.destroy();
-}
+export const isWorkerReady = (): boolean => workerReady;
 
-// Export the setup function
 export default setupPDFWorker; 

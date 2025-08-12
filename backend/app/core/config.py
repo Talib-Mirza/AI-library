@@ -22,6 +22,37 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ADMIN_SECRET_KEY: str = "your-super-secret-admin-key"  # Change this in production!
+    INIT_ADMIN_EMAIL: Optional[str] = None
+    INIT_ADMIN_PASSWORD: Optional[str] = None
+    
+    # Google OAuth
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+
+    # Email/SMTP
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
+    MAIL_FROM: Optional[str] = None
+    MAIL_FROM_NAME: str = "Thesyx"
+
+    # URLs
+    BACKEND_URL: str = "http://localhost:8000"
+    FRONTEND_URL: str = "http://localhost:5173"
+    # Accept alternate env var names without validation errors
+    FRONTEND_ORIGIN: Optional[str] = None
+    BACKEND_ORIGIN: Optional[str] = None
+
+    # Email verification
+    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+    
+    # Derived setting for refresh token expire in minutes
+    @property
+    def REFRESH_TOKEN_EXPIRE_MINUTES(self) -> int:
+        return self.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60
     
     # CORS
     CORS_ORIGINS: List[AnyHttpUrl] = []
@@ -55,11 +86,15 @@ class Settings(BaseSettings):
     # AI APIs
     OPENAI_API_KEY: str
     GOOGLE_API_KEY: str 
+    GOOGLE_TTS_API_KEY: str
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None 
     
     # Stripe
     STRIPE_SECRET_KEY: str
     STRIPE_WEBHOOK_SECRET: str
-    STRIPE_PRICE_ID: str
+    STRIPE_PRICE_ID: Optional[str] = None
+    STRIPE_PRICE_PRO_MONTHLY: Optional[str] = None
+    STRIPE_PORTAL_LINK: Optional[str] = None
     
     # Other Services
     SENTRY_DSN: Optional[str] = None
@@ -86,6 +121,14 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         case_sensitive = True
 
+    # Helpers to normalize alt env var names
+    @property
+    def EFFECTIVE_FRONTEND_URL(self) -> str:
+        return self.FRONTEND_ORIGIN or self.FRONTEND_URL
+
+    @property
+    def EFFECTIVE_BACKEND_URL(self) -> str:
+        return self.BACKEND_ORIGIN or self.BACKEND_URL
 
 # Create settings instance
 settings = Settings() 

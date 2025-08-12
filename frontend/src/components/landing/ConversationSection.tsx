@@ -176,20 +176,20 @@ const ConversationSection = () => {
 
   const paragraphContent = [
     {
-      title: "Natural Conversations",
-      content: "Experience the future of document interaction. Our advanced AI doesn't just search through your documents—it understands context, remembers previous conversations, and provides intelligent responses that feel genuinely human."
+      title: "Ask AI about your PDFs",
+      content: "Upload a document and ask questions in plain language. Get page-aware answers grounded in your content with helpful references."
     },
     {
-      title: "Contextual Understanding", 
-      content: "Ask questions in plain language and receive detailed answers backed by your document's content. Whether you're researching, studying, or exploring ideas, our AI adapts to your specific needs and learning style."
+      title: "Citations and context",
+      content: "Answers reference your uploaded material so you can quickly jump to the right section and verify context."
     },
     {
-      title: "Multi-Document Intelligence",
-      content: "Connect insights across your entire library. Our AI can reference multiple documents simultaneously, creating connections and providing comprehensive answers that span your entire knowledge base."
+      title: "Read it out loud (TTS)",
+      content: "Turn any page into natural-sounding audio. Adjust speed, pitch, and voice for a comfortable listening experience."
     },
     {
-      title: "Personalized Learning",
-      content: "The more you interact, the better it gets. Our AI learns your preferences, writing style, and areas of interest, delivering increasingly personalized and relevant responses over time."
+      title: "Smooth PDF experience",
+      content: "Modern viewer with search, highlighting, and efficient rendering designed for large documents."
     }
   ];
 
@@ -269,11 +269,10 @@ const ConversationSection = () => {
           <div ref={featureListRef} className="space-y-4">
             <h3 className="text-2xl font-bold text-purple-300 mb-6">Key Features:</h3>
             {[
-              "Voice & text conversations",
-              "Real-time document analysis", 
-              "Context-aware responses",
-              "Multi-language support",
-              "Export conversation history"
+              "AI chat grounded in your documents",
+              "Citations to pages and sources",
+              "Text-to-speech with voice and speed controls",
+              "Fast, modern PDF viewing"
             ].map((feature, index) => (
               <div key={index} className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
@@ -290,7 +289,7 @@ const ConversationSection = () => {
               <div className="w-3 h-3 bg-red-400 rounded-full"></div>
               <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
               <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-              <span className="ml-4 text-sm text-gray-400">AI Library Chat</span>
+              <span className="ml-4 text-sm text-gray-400">Thesyx Chat</span>
             </div>
 
             <div className="space-y-4 max-h-96 overflow-hidden">

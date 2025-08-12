@@ -11,14 +11,15 @@ services:
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
-      - ./vector_db:/app/vector_db
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_library
-      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
     depends_on:
       - db
       - redis
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   # Frontend
   frontend:
@@ -35,23 +36,6 @@ services:
     command: npm run dev
     depends_on:
       - backend
-
-  # Celery Worker for background tasks
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    volumes:
-      - ./backend:/app
-      - ./uploads:/app/uploads
-      - ./vector_db:/app/vector_db
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_library
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - backend
-      - redis
-    command: celery -A app.worker.celery worker --loglevel=info
 
   # PostgreSQL Database
   db:

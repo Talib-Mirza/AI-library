@@ -1,6 +1,7 @@
 from typing import Optional, List
+from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # User schemas
 class UserBase(BaseModel):
@@ -21,6 +22,10 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     password: Optional[str] = Field(None, min_length=8)
     is_active: Optional[bool] = None
+    profile_picture_url: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
 
 
 class UserResponse(UserBase):
@@ -29,6 +34,32 @@ class UserResponse(UserBase):
     is_active: bool
     is_admin: bool
     has_active_subscription: bool
+    profile_picture_url: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
+    total_files_uploaded: int = 0
+    total_tts_minutes: int = 0
+    total_ai_queries: int = 0
+    created_at: str
+    subscription_status: Optional[str] = None
+    subscription_tier: Optional[str] = None
+    subscription_renewal_at: Optional[str] = None
+    
+    @field_validator('created_at', mode='before')
+    @classmethod
+    def validate_created_at(cls, v):
+        """Convert datetime to string if needed."""
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
+    
+    @field_validator('subscription_renewal_at', mode='before')
+    @classmethod
+    def validate_subscription_renewal_at(cls, v):
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
     
     class Config:
         from_attributes = True
@@ -64,4 +95,39 @@ class PaginatedUsers(BaseModel):
     items: List[UserResponse]
     total: int
     skip: int
-    limit: int 
+    limit: int
+
+
+class GoogleCredential(BaseModel):
+    """Google OAuth credential model."""
+    credential: str = Field(..., description="Google OAuth ID token")
+
+
+class ProfileUpdate(BaseModel):
+    """Profile update model."""
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
+
+
+class PasswordChange(BaseModel):
+    """Password change model."""
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+
+class UserStats(BaseModel):
+    """User statistics model."""
+    # Totals (lifetime)
+    total_files_uploaded: int
+    total_tts_minutes: int
+    total_ai_queries: int = 0
+    # Monthly usage (current period)
+    monthly_tts_minutes_used: int = 0
+    monthly_ai_queries_used: int = 0
+    monthly_book_uploads_used: int = 0
+    # Dates
+    last_upload_date: Optional[str] = None
+    last_tts_usage: Optional[str] = None 

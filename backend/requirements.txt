@@ -17,9 +17,12 @@ pydantic_core==2.33.2
 # Authentication & Security
 python-jose==3.4.0
 passlib[bcrypt]==1.7.4
-bcrypt==4.1.2
+bcrypt==3.2.2
 PyJWT==2.10.1
 python-multipart==0.0.20
+google-auth==2.40.3
+google-auth-oauthlib==1.2.2
+requests==2.32.3
 
 # PDF Processing
 pymupdf==1.23.8
@@ -35,15 +38,13 @@ google-generativeai==0.3.2
 tiktoken==0.8.0
 
 # Vector Stores & Embeddings
-faiss-cpu==1.7.4
+#faiss-cpu==1.7.4
 numpy==1.26.4
 scipy==1.14.1
 
 # ChromaDB Support
-chromadb==0.4.24
+#chromadb==0.4.24
 
-# Weaviate Support
-weaviate-client==3.25.1
 
 # Background Tasks
 redis==5.0.1
@@ -54,7 +55,7 @@ stripe==7.3.0
 
 # Logging & Monitoring
 structlog==25.4.0
-sentry-sdk==2.27.0
+sentry-sdk==2.31.0
 
 # Rate Limiting
 slowapi==0.1.8
@@ -67,3 +68,4 @@ email-validator==2.1.1
 
 # HTTP Client
 httpx==0.28.1 
+aiohttp==3.8.6 

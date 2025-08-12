@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import gsap from 'gsap';
 import { motion } from 'framer-motion';
+import GoogleOAuthButton from '../components/auth/GoogleOAuthButton';
 
 // Password strength checker function
 const calculatePasswordStrength = (password: string): { score: number; feedback: string } => {
@@ -62,7 +63,10 @@ const RegisterPage = () => {
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, feedback: '' });
   const { register } = useAuth();
   const navigate = useNavigate();
-  
+
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -140,8 +144,8 @@ const RegisterPage = () => {
     
     try {
       await register(fullName, email, password);
-      toast.success('Account created successfully!');
-      navigate('/dashboard');
+      toast.success('Account created! Please check your email to verify your account.');
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
     } catch (error) {
       console.error('Registration error:', error);
       toast.error('Failed to create account. Please try again.');
@@ -174,7 +178,7 @@ const RegisterPage = () => {
           </motion.div>
           
           <h1 ref={titleRef} className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-purple-100 mb-2">
-            Join AI Library
+            Join Thesyx
           </h1>
           <p className="text-gray-400 text-lg">Create your account and start exploring</p>
         </div>
@@ -321,13 +325,13 @@ const RegisterPage = () => {
                 />
                 <label htmlFor="agree-terms" className="ml-3 block text-sm text-gray-300">
                   I agree to the{' '}
-                  <a href="#" className="text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200">
-                    Terms and Conditions
-                  </a>
+                  <button type="button" onClick={() => setShowTerms(true)} className="text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200 underline underline-offset-2">
+                    Terms of Service
+                  </button>
                   {' '}and{' '}
-                  <a href="#" className="text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200">
+                  <button type="button" onClick={() => setShowPrivacy(true)} className="text-blue-400 hover:text-blue-300 font-medium transition-colors duration-200 underline underline-offset-2">
                     Privacy Policy
-                  </a>
+                  </button>
                 </label>
               </div>
             </div>
@@ -355,6 +359,26 @@ const RegisterPage = () => {
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
             </motion.button>
+
+            {/* Divider */}
+            <div className="relative flex items-center justify-center py-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-600/30"></div>
+              </div>
+              <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 px-4">
+                <span className="text-sm text-gray-400 font-medium">OR</span>
+              </div>
+            </div>
+
+            {/* Google OAuth Button */}
+            <GoogleOAuthButton 
+              onSuccess={() => {
+                console.log('Google OAuth success');
+              }}
+              onError={(error) => {
+                console.error('Google OAuth error:', error);
+              }}
+            />
           </form>
         </motion.div>
         
@@ -375,6 +399,46 @@ const RegisterPage = () => {
           </Link>
         </motion.p>
       </div>
+
+      {/* Privacy Modal */}
+      {showPrivacy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-3xl rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Privacy Policy</h3>
+              <button onClick={() => setShowPrivacy(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              <iframe title="Privacy Policy" src="/privacy" className="w-full h-[65vh] rounded-lg bg-white dark:bg-gray-900"></iframe>
+            </div>
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+              <a href="/privacy" target="_blank" rel="noopener" onClick={() => setShowPrivacy(false)} className="text-blue-600 hover:text-blue-500 font-medium">Open full page</a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terms Modal */}
+      {showTerms && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-3xl rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Terms of Service</h3>
+              <button onClick={() => setShowTerms(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              <iframe title="Terms of Service" src="/terms" className="w-full h-[65vh] rounded-lg bg-white dark:bg-gray-900"></iframe>
+            </div>
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+              <a href="/terms" target="_blank" rel="noopener" onClick={() => setShowTerms(false)} className="text-blue-600 hover:text-blue-500 font-medium">Open full page</a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

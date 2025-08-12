@@ -3,80 +3,6 @@ import { motion } from 'framer-motion';
 import OptimizedPDFService, { PDFDocumentData, PDFPageData, PDFTextSpan } from '../../services/OptimizedPDFService';
 import './PDFTextLayer.css';
 
-// Add CSS styles for text layer and hover highlighting
-const textLayerStyles = `
-.textLayer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  overflow: hidden;
-  opacity: 0;
-  line-height: 1.0;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  pointer-events: auto;
-  z-index: 10;
-}
-
-.textLayer > span,
-.textLayer > div {
-  position: absolute;
-  color: transparent;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  cursor: pointer;
-  pointer-events: auto;
-  white-space: pre;
-  margin: 0;
-  padding: 0;
-  display: inline-block;
-  box-sizing: border-box;
-  transition: background-color 0.2s ease;
-}
-
-.hover-highlight {
-  background: rgba(59, 130, 246, 0.2) !important;
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3);
-  border-radius: 2px;
-}
-
-.sentence-group {
-  position: relative;
-}
-
-.sentence-group::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  background: rgba(59, 130, 246, 0.15);
-  border-radius: 4px;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.sentence-group.highlight::before {
-  opacity: 1;
-}
-`;
-
-// Inject styles if not already present
-if (typeof document !== 'undefined' && !document.getElementById('pdf-text-layer-styles')) {
-  const style = document.createElement('style');
-  style.id = 'pdf-text-layer-styles';
-  style.textContent = textLayerStyles;
-  document.head.appendChild(style);
-}
-
 interface VirtualizedPageProps {
   pageNumber: number;
   documentData: PDFDocumentData | null;
@@ -91,47 +17,7 @@ interface VirtualizedPageProps {
   intersectionObserver?: IntersectionObserver | null;
 }
 
-// Text chunking utilities
-const isEndOfSentence = (text: string): boolean => {
-  return /[.!?][\s]*$/.test(text.trim());
-};
 
-const isListItem = (text: string): boolean => {
-  return /^[\s]*[•·‣⁃▪▫◦‣⁌⁍]*[\s]*[a-zA-Z0-9]/.test(text) || 
-         /^[\s]*\d+\.[\s]/.test(text) ||
-         /^[\s]*[a-zA-Z]\.[\s]/.test(text) ||
-         /^[\s]*[-*+][\s]/.test(text);
-};
-
-const isNewParagraph = (text: string): boolean => {
-  return /^[\s]*[A-Z]/.test(text);
-};
-
-const shouldStartNewChunk = (currentText: string, nextText: string): boolean => {
-  // Don't start new chunk if current text is very short (likely partial word/line)
-  if (currentText.length < 20) return false;
-  
-  // Start new chunk if current text ends with sentence-ending punctuation followed by space
-  if (/[.!?]\s*$/.test(currentText.trim())) {
-    return true;
-  }
-  
-  // Start new chunk if next text starts with capital letter after significant content
-  if (currentText.length > 50 && /^[A-Z]/.test(nextText.trim())) {
-    return true;
-  }
-  
-  // Start new chunk if current chunk is getting very long (>300 chars for paragraphs)
-  if (currentText.length > 300) return true;
-  
-  // Start new chunk if next text looks like a new paragraph (indented or after line break)
-  if (isNewParagraph(nextText) && currentText.length > 100) return true;
-  
-  // Start new chunk if next text is a list item
-  if (isListItem(nextText)) return true;
-  
-  return false;
-};
 
 const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>(({
   pageNumber,
@@ -147,12 +33,6 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
   const [error, setError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
-  const [hoveredChunk, setHoveredChunk] = useState<number | null>(null);
-  const [textChunks, setTextChunks] = useState<Array<{
-    text: string;
-    bounds: DOMRect;
-    items: any[];
-  }>>([]);
   
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -172,26 +52,18 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
     containerRef.current = node;
   }, [ref]);
 
-  // Optimized load function
+  // Load PDF page
   const loadPage = useCallback(async () => {
     if (!documentData || loadingRef.current) {
       return;
     }
     
-    console.log(`[PDFPage ${pageNumber}] Starting to load page`);
     loadingRef.current = true;
     setIsLoading(true);
     setError(null);
     
     try {
       const data = await OptimizedPDFService.getPageWithTextLayer(documentData, pageNumber, scale);
-      
-      console.log(`[PDFPage ${pageNumber}] Page data loaded:`, {
-        hasCanvas: !!data.canvas,
-        hasTextContent: !!data.textContent,
-        textItems: data.textContent?.items?.length || 0,
-        viewport: { width: data.viewport?.width, height: data.viewport?.height }
-      });
       
       setPageData(data);
       setHasLoaded(true);
@@ -204,7 +76,6 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
           canvasRef.current.style.width = `${data.viewport.width}px`;
           canvasRef.current.style.height = `${data.viewport.height}px`;
           context.drawImage(data.canvas, 0, 0);
-          console.log(`[PDFPage ${pageNumber}] Canvas rendered successfully`);
         }
       }
     } catch (err) {
@@ -227,207 +98,49 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
     setPageData(null);
   }, [scale]);
 
-  // Create intelligent text chunks based on PDF.js textContent items directly
-  const createTextChunks = useCallback((textItems: any[]) => {
-    console.log(`[PDFPage ${pageNumber}] Creating text chunks from ${textItems.length} text items`);
-    
-    if (!pageData?.viewport || textItems.length === 0) {
-      console.log(`[PDFPage ${pageNumber}] No viewport or text items available`);
-      return [];
-    }
-
-    // Use requestAnimationFrame to ensure DOM is ready
-    requestAnimationFrame(() => {
-      const chunks: Array<{
-        text: string;
-        bounds: DOMRect;
-        items: any[];
-      }> = [];
-
-      let currentChunk = '';
-      let currentItems: any[] = [];
-      
-      const viewport = pageData.viewport;
-      
-      textItems.forEach((item: any, index: number) => {
-        if (!item.str || !item.str.trim()) return;
-
-        // Add item to current chunk
-        currentChunk += (currentChunk ? ' ' : '') + item.str;
-        currentItems.push(item);
-
-        // Check if we should start a new chunk
-        const nextItem = textItems[index + 1];
-        const shouldEnd = shouldStartNewChunk(currentChunk, nextItem?.str || '');
-        
-        if (shouldEnd || index === textItems.length - 1) {
-          if (currentItems.length > 0) {
-            // Calculate bounds directly from PDF.js transform data
-            const bounds = calculateChunkBounds(currentItems, viewport);
-            
-            console.log(`[PDFPage ${pageNumber}] Created chunk ${chunks.length}:`, {
-              text: currentChunk.substring(0, 30) + '...',
-              items: currentItems.length,
-              bounds: {
-                left: bounds.left.toFixed(1),
-                top: bounds.top.toFixed(1),
-                width: bounds.width.toFixed(1),
-                height: bounds.height.toFixed(1)
-              }
-            });
-            
-            chunks.push({
-              text: currentChunk.trim(),
-              bounds,
-              items: [...currentItems],
-            });
-          }
-          
-          // Reset for next chunk
-          currentChunk = '';
-          currentItems = [];
-        }
-      });
-      
-      console.log(`[PDFPage ${pageNumber}] Created ${chunks.length} text chunks total`);
-      setTextChunks(chunks);
-    });
-    
-    return [];
-  }, [pageNumber, pageData]);
-
-  // Calculate chunk bounds directly from PDF.js item transforms
-  const calculateChunkBounds = useCallback((items: any[], viewport: any): DOMRect => {
-    if (items.length === 0) return new DOMRect();
-    
-    const pdfjsLib = (window as any).pdfjsLib;
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    
-    items.forEach((item: any) => {
-      if (!item.transform || item.transform.length < 6) return;
-      
-      // Use PDF.js coordinate transformation
-      const transform = pdfjsLib?.Util?.transform?.(viewport.transform, item.transform) || item.transform;
-      const [scaleX, skewY, skewX, scaleY, translateX, translateY] = transform;
-      
-      const x = translateX;
-      const y = viewport.height - translateY; // Convert from PDF bottom-up to DOM top-down
-      
-      // Calculate actual text width more accurately
-      const fontSize = Math.sqrt(scaleX * scaleX + skewY * skewY);
-      const estimatedCharWidth = fontSize * 0.6; // More accurate character width estimation
-      const textWidth = item.width || (item.str.length * estimatedCharWidth);
-      const textHeight = Math.abs(scaleY);
-      
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x + textWidth);
-      minY = Math.min(minY, y - textHeight); // Adjust for text baseline
-      maxY = Math.max(maxY, y);
-    });
-    
-    // Add some padding for better visual feedback
-    const padding = 2;
-    return new DOMRect(
-      minX - padding,
-      minY - padding,
-      (maxX - minX) + (padding * 2),
-      (maxY - minY) + (padding * 2)
-    );
-  }, []);
-
-  // Professional text layer rendering
+  // Render text layer with proper PDF.js text selection
   const renderTextLayer = useCallback(async () => {
     if (!textLayerRef.current || !pageData?.textContent || !pageData?.viewport) {
-      console.log(`[PDFPage ${pageNumber}] Missing requirements for text layer rendering:`, {
-        hasTextLayer: !!textLayerRef.current,
-        hasTextContent: !!pageData?.textContent,
-        hasViewport: !!pageData?.viewport
-      });
       return;
     }
-    
-    console.log(`[PDFPage ${pageNumber}] Starting text layer rendering`);
     
     // Clear existing content
     textLayerRef.current.innerHTML = '';
     
     try {
-      // Try PDF.js native methods first
       const pdfjsLib = (window as any).pdfjsLib;
-      console.log(`[PDFPage ${pageNumber}] PDF.js available:`, !!pdfjsLib);
       
       if (pdfjsLib?.TextLayerBuilder) {
-        console.log(`[PDFPage ${pageNumber}] Using TextLayerBuilder`);
         
         const textLayerBuilder = new pdfjsLib.TextLayerBuilder({
           container: textLayerRef.current,
           viewport: pageData.viewport,
-          enhanceTextSelection: false,
+          enhanceTextSelection: true, // Enable native PDF.js text selection
         });
         
         await textLayerBuilder.render(pageData.textContent);
-        
-        // Apply styling for hover interaction
-        const spans = textLayerRef.current.querySelectorAll('span, div');
-        console.log(`[PDFPage ${pageNumber}] Applied styling to ${spans.length} text elements`);
-        
-        spans.forEach((element, index) => {
-          const htmlElement = element as HTMLElement;
-          htmlElement.style.color = 'transparent';
-          htmlElement.style.userSelect = 'none';
-          htmlElement.style.cursor = 'pointer';
-          htmlElement.style.pointerEvents = 'auto';
-          htmlElement.dataset.elementIndex = index.toString();
-        });
-        
-        // Create intelligent text chunks after rendering
-        const textItems = pageData.textContent.items || [];
-        createTextChunks(textItems);
         
         return;
       }
       
       if (pdfjsLib?.renderTextLayer) {
-        console.log(`[PDFPage ${pageNumber}] Using renderTextLayer`);
         
         const task = pdfjsLib.renderTextLayer({
           textContentSource: pageData.textContent,
           container: textLayerRef.current,
           viewport: pageData.viewport,
           textDivs: [],
-          enhanceTextSelection: false,
+          enhanceTextSelection: true, // Enable native PDF.js text selection
         });
         
         await task.promise;
         
-        const spans = textLayerRef.current.querySelectorAll('span, div');
-        console.log(`[PDFPage ${pageNumber}] Applied styling to ${spans.length} text elements (renderTextLayer)`);
-        
-        spans.forEach((element, index) => {
-          const htmlElement = element as HTMLElement;
-          htmlElement.style.color = 'transparent';
-          htmlElement.style.userSelect = 'none';
-          htmlElement.style.cursor = 'pointer';
-          htmlElement.style.pointerEvents = 'auto';
-          htmlElement.dataset.elementIndex = index.toString();
-        });
-        
-        const textItems = pageData.textContent.items || [];
-        createTextChunks(textItems);
-        
         return;
-      }
-    } catch (error) {
-      console.warn(`[PDFPage ${pageNumber}] PDF.js text layer rendering failed:`, error);
     }
 
-    // Manual text layer implementation
-    console.log(`[PDFPage ${pageNumber}] Using manual text layer implementation`);
+      // Fallback: Manual text layer with proper coordinates
     const textItems = pageData.textContent.items || [];
     const viewport = pageData.viewport;
-    
-    console.log(`[PDFPage ${pageNumber}] Manual rendering with ${textItems.length} text items`);
     
     textItems.forEach((item: any, index: number) => {
       if (!item.str || !item.str.trim()) return;
@@ -436,19 +149,17 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
       span.textContent = item.str;
       span.style.position = 'absolute';
       span.style.color = 'transparent';
-      span.style.userSelect = 'none';
-      span.style.cursor = 'pointer';
-      span.style.pointerEvents = 'auto';
+        span.style.userSelect = 'text';
+        span.style.cursor = 'text';
       span.style.whiteSpace = 'pre';
       span.style.margin = '0';
       span.style.padding = '0';
-      span.style.display = 'inline-block';
-      span.style.boxSizing = 'border-box';
+        span.style.transformOrigin = '0% 0%';
       
-      // Professional coordinate transformation
+        // Calculate position and size from PDF.js transform
       const transform = item.transform;
       if (transform && transform.length >= 6) {
-        const transformMatrix = (window as any).pdfjsLib?.Util?.transform?.(viewport.transform, transform) || transform;
+          const transformMatrix = pdfjsLib?.Util?.transform?.(viewport.transform, transform) || transform;
         const [scaleX, skewY, skewX, scaleY, translateX, translateY] = transformMatrix;
         
         const x = translateX;
@@ -460,37 +171,87 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
         const fontSize = Math.sqrt(scaleX * scaleX + skewY * skewY);
         span.style.fontSize = `${fontSize}px`;
         
-        const charWidth = fontSize * 0.6;
-        const textWidth = item.width || (charWidth * item.str.length);
-        const textHeight = fontSize;
-        
-        span.style.width = `${textWidth}px`;
-        span.style.height = `${textHeight}px`;
-        span.style.lineHeight = `${textHeight}px`;
+          // Apply rotation if needed
+          if (Math.abs(skewY) > 0.01 || Math.abs(skewX) > 0.01) {
+            const rotation = Math.atan2(skewY, scaleX) * (180 / Math.PI);
+            span.style.transform = `rotate(${rotation.toFixed(2)}deg)`;
+          }
         
         if (item.fontName) {
           span.style.fontFamily = item.fontName;
         }
         
-        if (Math.abs(skewY) > 0.01 || Math.abs(skewX) > 0.01) {
-          const rotation = Math.atan2(skewY, scaleX) * (180 / Math.PI);
-          span.style.transform = `rotate(${rotation.toFixed(2)}deg)`;
-          span.style.transformOrigin = '0 0';
+          textLayerRef.current!.appendChild(span);
+        }
+      });
+      
+    } catch (error) {
+      console.warn(`[PDFPage ${pageNumber}] Text layer rendering failed:`, error);
+    }
+  }, [pageData, pageNumber]);
+
+  // Handle text selection with improved position data - ONLY from this PDF page
+  const handleTextSelection = useCallback(() => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+      return;
         }
         
-        span.dataset.textIndex = index.toString();
-        span.dataset.originalText = item.str;
-        span.dataset.elementIndex = index.toString();
-        
-        textLayerRef.current!.appendChild(span);
+    const selectedText = selection.toString();
+    if (selectedText.trim().length > 0) {
+      // Check if the selection is within this PDF page
+      const range = selection.getRangeAt(0);
+      const selectionContainer = range.commonAncestorContainer;
+      
+      // Verify the selection is within our text layer
+      let isWithinPDFPage = false;
+      let currentNode: Node | null = selectionContainer;
+      
+      while (currentNode && currentNode !== document.body) {
+        if (currentNode === textLayerRef.current) {
+          isWithinPDFPage = true;
+          break;
+        }
+        currentNode = currentNode.parentNode;
       }
-    });
+      
+      // Only process selections from within this PDF page's text layer
+      if (!isWithinPDFPage) {
+        return;
+      }
+      
+      // Get selection bounds for better positioning
+      const rect = range.getBoundingClientRect();
+      
+      // Calculate position relative to the page container
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const relativeX = containerRect ? rect.left - containerRect.left : 0;
+      const relativeY = containerRect ? rect.top - containerRect.top : 0;
     
-    console.log(`[PDFPage ${pageNumber}] Manual text layer completed, creating chunks`);
+      // Create spans with better position data
+      const spans: PDFTextSpan[] = [{
+        text: selectedText,
+        x: relativeX,
+        y: relativeY,
+        width: rect.width,
+        height: rect.height,
+        fontSize: 12,
+        fontName: 'default',
+        transform: [1, 0, 0, 1, relativeX, relativeY]
+      }];
+      
+      onTextSelect?.(selectedText, spans);
+    }
+  }, [pageNumber, onTextSelect]);
+
+  // Add selection change listener
+  useEffect(() => {
+    document.addEventListener('selectionchange', handleTextSelection);
     
-    // Create intelligent text chunks after manual rendering
-    createTextChunks(textItems);
-  }, [pageData, pageNumber, createTextChunks]);
+    return () => {
+      document.removeEventListener('selectionchange', handleTextSelection);
+    };
+  }, [handleTextSelection]);
 
   // Monitor canvas ref and re-render if needed
   useEffect(() => {
@@ -506,118 +267,9 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
     }
   }, [pageData, pageNumber, canvasReady]);
 
-  // Handle hover interactions with improved coordinate calculation
-  const handleMouseMove = useCallback((event: React.MouseEvent) => {
-    if (!textLayerRef.current || textChunks.length === 0) {
-      console.log(`[PDFPage ${pageNumber}] Mouse move ignored - no text layer (${!!textLayerRef.current}) or chunks (${textChunks.length})`);
-      return;
-    }
-    
-    // Get page-relative coordinates
-    const pageRect = containerRef.current?.getBoundingClientRect();
-    const layerRect = textLayerRef.current.getBoundingClientRect();
-    
-    if (!pageRect || !layerRect) {
-      console.log(`[PDFPage ${pageNumber}] Missing rect data for coordinate calculation`);
-      return;
-    }
-    
-    // Calculate coordinates relative to the page container
-    const pageX = event.clientX - pageRect.left;
-    const pageY = event.clientY - pageRect.top;
-    
-    // Calculate coordinates relative to the text layer
-    const layerX = event.clientX - layerRect.left;
-    const layerY = event.clientY - layerRect.top;
-    
-    console.log(`[PDFPage ${pageNumber}] Mouse position - Page: (${pageX.toFixed(1)}, ${pageY.toFixed(1)}), Layer: (${layerX.toFixed(1)}, ${layerY.toFixed(1)}), Chunks: ${textChunks.length}`);
-    
-    // Find which chunk the mouse is over
-    let foundChunk = -1;
-    for (let i = 0; i < textChunks.length; i++) {
-      const chunk = textChunks[i];
-      
-      // Chunk bounds are already in layer-relative coordinates
-      const chunkLeft = chunk.bounds.left;
-      const chunkTop = chunk.bounds.top;
-      const chunkRight = chunkLeft + chunk.bounds.width;
-      const chunkBottom = chunkTop + chunk.bounds.height;
-      
-      // Check if mouse is within chunk bounds (with some padding)
-      const padding = 5;
-      const isInside = layerX >= chunkLeft - padding && 
-                      layerX <= chunkRight + padding &&
-                      layerY >= chunkTop - padding && 
-                      layerY <= chunkBottom + padding;
-      
-      if (i < 3) { // Log first few chunks for debugging
-        console.log(`[PDFPage ${pageNumber}] Chunk ${i} bounds: (${chunkLeft.toFixed(1)}, ${chunkTop.toFixed(1)}, ${chunkRight.toFixed(1)}, ${chunkBottom.toFixed(1)}) - Inside: ${isInside}`);
-      }
-      
-      if (isInside) {
-        console.log(`[PDFPage ${pageNumber}] Mouse over chunk ${i}: "${chunk.text.substring(0, 30)}..." at bounds (${chunkLeft.toFixed(1)}, ${chunkTop.toFixed(1)}, ${chunkRight.toFixed(1)}, ${chunkBottom.toFixed(1)})`);
-        foundChunk = i;
-        break;
-      }
-    }
-    
-    if (foundChunk !== hoveredChunk) {
-      console.log(`[PDFPage ${pageNumber}] Hovered chunk changed from ${hoveredChunk} to ${foundChunk}`);
-      setHoveredChunk(foundChunk >= 0 ? foundChunk : null);
-    }
-  }, [textChunks, hoveredChunk, pageNumber]);
-
-  const handleMouseLeave = useCallback(() => {
-    console.log(`[PDFPage ${pageNumber}] Mouse left page, clearing hover`);
-    setHoveredChunk(null);
-  }, [pageNumber]);
-
-  const handleChunkClick = useCallback(() => {
-    if (hoveredChunk !== null && textChunks[hoveredChunk]) {
-      const chunk = textChunks[hoveredChunk];
-      console.log(`[PDFPage ${pageNumber}] Chunk clicked: "${chunk.text}"`);
-      onTextSelect?.(chunk.text, pageData?.textSpans || []);
-    } else {
-      console.log(`[PDFPage ${pageNumber}] Click ignored - no hovered chunk`);
-    }
-  }, [hoveredChunk, textChunks, onTextSelect, pageData?.textSpans, pageNumber]);
-
-  // Apply highlighting to hovered chunk
-  useEffect(() => {
-    if (!textLayerRef.current) return;
-    
-    // Remove all existing highlights
-    const elements = textLayerRef.current.querySelectorAll('.hover-highlight');
-    elements.forEach(el => el.classList.remove('hover-highlight'));
-    
-    // Apply highlight to current chunk by finding corresponding text elements
-    if (hoveredChunk !== null && textChunks[hoveredChunk]) {
-      const chunk = textChunks[hoveredChunk];
-      console.log(`[PDFPage ${pageNumber}] Applying highlight to chunk ${hoveredChunk} with ${chunk.items.length} items`);
-      
-      // Find text elements that correspond to this chunk's items
-      const textElements = Array.from(textLayerRef.current.querySelectorAll('span, div')) as HTMLElement[];
-      
-      chunk.items.forEach((item, itemIndex) => {
-        // Find the corresponding DOM element by matching text content
-        const matchingElement = textElements.find(el => 
-          el.textContent?.trim() === item.str?.trim()
-        );
-        
-        if (matchingElement) {
-          matchingElement.classList.add('hover-highlight');
-          console.log(`[PDFPage ${pageNumber}] Added highlight to element for item ${itemIndex}: "${item.str}"`);
-        } else {
-          console.warn(`[PDFPage ${pageNumber}] Could not find DOM element for item ${itemIndex}: "${item.str}"`);
-        }
-      });
-    }
-  }, [hoveredChunk, textChunks, pageNumber]);
-
   // Render text layer when page data is available
   useEffect(() => {
     if (pageData?.textContent && textLayerRef.current) {
-      console.log(`[PDFPage ${pageNumber}] Triggering text layer render`);
       renderTextLayer();
     }
   }, [pageData, renderTextLayer, pageNumber]);
@@ -634,7 +286,7 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
         margin: '0 auto',
       }}
     >
-      {/* Canvas for PDF content with text layer overlay */}
+      {/* Canvas for PDF content */}
       {pageData?.canvas ? (
         <div className="relative w-full h-full">
           <canvas
@@ -649,7 +301,7 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
             }}
           />
           
-          {/* Interactive text layer for hover highlighting */}
+          {/* Text layer for selection */}
           <div
             ref={textLayerRef}
             className="textLayer absolute inset-0 w-full h-full"
@@ -659,14 +311,11 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
               fontSize: '1px',
               lineHeight: '1',
               overflow: 'hidden',
-              userSelect: 'none',
-              cursor: 'pointer',
+              userSelect: 'text',
+              cursor: 'text',
               zIndex: 10,
               pointerEvents: 'auto',
             }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onClick={handleChunkClick}
           />
         </div>
       ) : pageData ? (
@@ -727,41 +376,6 @@ const VirtualizedPDFPage = memo(forwardRef<HTMLDivElement, VirtualizedPageProps>
       <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded opacity-0 hover:opacity-100 transition-opacity z-20">
         {pageNumber}
       </div>
-      
-      {/* Hover tooltip */}
-      {hoveredChunk !== null && textChunks[hoveredChunk] && (
-        <div className="absolute bottom-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded shadow-lg z-20 max-w-xs">
-          Click to select: "{textChunks[hoveredChunk].text.slice(0, 50)}..."
-        </div>
-      )}
-      
-      {/* Debug overlay showing chunk bounds for testing */}
-      {textChunks.length > 0 && (
-        <div className="absolute inset-0 pointer-events-none z-15">
-          {textChunks.map((chunk, index) => (
-            <div
-              key={index}
-              className={`absolute border-2 ${index === hoveredChunk ? 'border-blue-500 bg-blue-200/20' : 'border-green-400/50 bg-green-200/10'}`}
-              style={{
-                left: `${chunk.bounds.left}px`,
-                top: `${chunk.bounds.top}px`,
-                width: `${chunk.bounds.width}px`,
-                height: `${chunk.bounds.height}px`,
-                fontSize: '10px',
-                color: index === hoveredChunk ? '#1e40af' : '#16a34a',
-                backgroundColor: index === hoveredChunk ? 'rgba(59, 130, 246, 0.1)' : 'rgba(34, 197, 94, 0.05)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                padding: '1px',
-              }}
-            >
-              {index}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }), (prevProps, nextProps) => {

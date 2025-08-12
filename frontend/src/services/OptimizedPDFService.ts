@@ -2,6 +2,7 @@ import axios from 'axios';
 import pdfjsLib, { PDF_CONFIG, PDF_CONFIG_NO_WORKER, initializePDFWorker } from '../utils/pdfConfig';
 import type { PDFDocumentProxy, PDFPageProxy, TextItem, TextMarkedContent } from 'pdfjs-dist/types/src/display/api';
 import api from '../utils/axiosConfig';
+import { getAuthToken } from '../utils/auth';
 
 export interface PDFImage {
     filename: string;
@@ -87,8 +88,11 @@ class LRUCache<K, V> {
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxSize) {
       // Remove least recently used
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
+      const iterator = this.cache.keys().next();
+      if (!iterator.done) {
+        const firstKey = iterator.value as K;
+        this.cache.delete(firstKey);
+      }
     }
     this.cache.set(key, value);
   }
@@ -177,6 +181,8 @@ class OptimizedPDFService {
       cachehits: 0,
       cacheMisses: 0,
     };
+    
+    private readonly DEBUG = import.meta.env?.MODE === 'development' || (window as any)?.__DEBUG__;
 
     // Utility methods
     private getCacheKey(pageNumber: number, scale: number, bookId?: number): string {
@@ -263,54 +269,51 @@ class OptimizedPDFService {
     }
 
     private async loadDocumentInternal(url: string, cacheKey: string, bookId?: number): Promise<PDFDocumentData> {
-        console.log(`[OptimizedPDFService] Loading PDF: ${url}`);
+        if (this.DEBUG) console.debug(`[OptimizedPDFService] Loading PDF: ${url}`);
 
         try {
             await initializePDFWorker();
             
             let pdfData: ArrayBuffer | string = url;
+            let authHeaders: Record<string, string> | undefined = undefined;
             
+            // For authenticated PDFs, prefer streaming via PDF.js with Authorization header
             if (bookId && url.includes('/api/books/')) {
-                console.log(`[OptimizedPDFService] Fetching authenticated PDF for book ${bookId}`);
-                try {
-                    const response = await api.get(`/books/${bookId}/pdf`, {
-                        responseType: 'arraybuffer'
-                    });
-                    
-                    const blob = new Blob([response.data], { type: 'application/pdf' });
-                    const blobUrl = URL.createObjectURL(blob);
-                    this.pdfBlobs.set(cacheKey, blobUrl);
-                    pdfData = blobUrl;
-                    
-                    console.log(`[OptimizedPDFService] PDF fetched successfully`);
-                } catch (fetchError) {
-                    console.error(`[OptimizedPDFService] Error fetching PDF:`, fetchError);
-                    throw new Error(`Failed to fetch PDF: ${fetchError instanceof Error ? fetchError.message : 'Authentication failed'}`);
+                if (this.DEBUG) console.debug(`[OptimizedPDFService] Preparing authenticated streaming for book ${bookId}`);
+                const token = getAuthToken();
+                if (token) {
+                    authHeaders = { Authorization: `Bearer ${token}` };
                 }
+                // Keep pdfData as URL to enable range requests and streaming
+                pdfData = url;
             }
             
-            // Enhanced PDF.js loading with better config
+            // Choose config depending on worker readiness
+            const useWorker = (pdfjsLib as any).GlobalWorkerOptions?.workerSrc || '';
+
             let loadingTask = pdfjsLib.getDocument({
                 url: typeof pdfData === 'string' ? pdfData : undefined,
                 data: typeof pdfData !== 'string' ? pdfData : undefined,
-                ...PDF_CONFIG,
+                ...(useWorker ? PDF_CONFIG : PDF_CONFIG_NO_WORKER),
                 // Enhanced configuration for performance
-                verbosity: 0, // Reduce logging
-                maxImageSize: 16777216, // 16MB
+                verbosity: 0,
+                maxImageSize: 16777216,
                 cMapPacked: true,
-                enableXfa: false, // Disable XFA for speed
-                disableFontFace: false, // Keep fonts for quality
-                disableRange: false, // Enable range requests for large PDFs
-                disableStream: false, // Enable streaming
+                enableXfa: false,
+                disableFontFace: false,
+                disableRange: false,
+                disableStream: false,
+                httpHeaders: authHeaders,
+                rangeChunkSize: 1048576,
             });
 
             let document: PDFDocumentProxy;
             
             try {
                 document = await loadingTask.promise;
-                console.log(`[OptimizedPDFService] PDF loaded with ${document.numPages} pages`);
+                if (this.DEBUG) console.debug(`[OptimizedPDFService] PDF loaded with ${document.numPages} pages`);
             } catch (workerError) {
-                console.warn(`[OptimizedPDFService] Worker failed, trying fallback:`, workerError);
+                console.warn(`[OptimizedPDFService] Primary load failed, trying fallback:`, workerError);
                 
                 try {
                     loadingTask.destroy();
@@ -322,10 +325,14 @@ class OptimizedPDFService {
                     url: typeof pdfData === 'string' ? pdfData : undefined,
                     data: typeof pdfData !== 'string' ? pdfData : undefined,
                     ...PDF_CONFIG_NO_WORKER,
+                    httpHeaders: authHeaders,
+                    rangeChunkSize: 1048576,
+                    disableRange: false,
+                    disableStream: false,
                 });
 
                 document = await loadingTask.promise;
-                console.log(`[OptimizedPDFService] PDF loaded without worker`);
+                if (this.DEBUG) console.debug(`[OptimizedPDFService] PDF loaded without worker`);
             }
 
             const documentData: PDFDocumentData = {
@@ -438,7 +445,7 @@ class OptimizedPDFService {
                 this.performanceMetrics.renderTimes.shift();
             }
 
-            console.log(`[OptimizedPDFService] Page ${pageNumber} rendered in ${renderTime.toFixed(2)}ms`);
+            if (this.DEBUG) console.debug(`[OptimizedPDFService] Page ${pageNumber} rendered in ${renderTime.toFixed(2)}ms`);
 
             return pageData;
 
@@ -471,8 +478,9 @@ class OptimizedPDFService {
             // Use Promise.race to timeout text extraction if it takes too long
             const textContent = await Promise.race([
                 page.getTextContent({
-                    disableCombineTextItems: false, // Allow combining for performance
-                }),
+                    // Type cast for option not present in our local types, but supported by PDF.js
+                    ...( { disableCombineTextItems: false } as any ),
+                } as any),
                 new Promise((_, reject) => {
                     setTimeout(() => reject(new Error('Text extraction timeout')), 10000); // 10s timeout
                 })
@@ -486,18 +494,18 @@ class OptimizedPDFService {
                     
                     const transform = pdfjsLib.Util.transform(
                         viewport.transform,
-                        textItem.transform
+                        (textItem as any).transform
                     );
 
                     spans.push({
-                        text: textItem.str,
+                        text: (textItem as any).str,
                         x: transform[4],
                         y: transform[5],
-                        width: textItem.width,
-                        height: textItem.height,
-                        fontName: textItem.fontName,
+                        width: (textItem as any).width,
+                        height: (textItem as any).height,
+                        fontName: (textItem as any).fontName,
                         fontSize: Math.abs(transform[0]),
-                        transform: textItem.transform,
+                        transform: (textItem as any).transform,
                     });
                 }
             });
@@ -551,7 +559,7 @@ class OptimizedPDFService {
         spans: PDFTextSpan[];
         matches: Array<{ spanIndex: number; startOffset: number; endOffset: number }>;
     }>> {
-        const results = [];
+        const results: Array<{ pageNumber: number; spans: PDFTextSpan[]; matches: Array<{ spanIndex: number; startOffset: number; endOffset: number }>; }> = [];
         const normalizedQuery = query.toLowerCase();
 
         // Search in batches to prevent blocking
@@ -559,14 +567,14 @@ class OptimizedPDFService {
         for (let startPage = 1; startPage <= documentData.numPages; startPage += batchSize) {
             const endPage = Math.min(startPage + batchSize - 1, documentData.numPages);
             
-            const batchPromises = [];
+            const batchPromises: Array<Promise<any>> = [];
             for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
                 batchPromises.push(this.searchPageText(documentData, pageNum, normalizedQuery, scale));
             }
 
             const batchResults = await Promise.allSettled(batchPromises);
             
-            batchResults.forEach((result, index) => {
+            batchResults.forEach((result) => {
                 if (result.status === 'fulfilled' && result.value) {
                     results.push(result.value);
                 }
@@ -576,13 +584,13 @@ class OptimizedPDFService {
         return results;
     }
 
-    private async searchPageText(documentData: PDFDocumentData, pageNumber: number, query: string, scale: number): Promise<any | null> {
+    private async searchPageText(documentData: PDFDocumentData, pageNumber: number, query: string, scale: number): Promise<{ pageNumber: number; spans: PDFTextSpan[]; matches: Array<{ spanIndex: number; startOffset: number; endOffset: number }>; } | null> {
         try {
             const pageData = await this.getPage(documentData, pageNumber, scale);
             const pageText = pageData.textSpans.map(span => span.text).join(' ').toLowerCase();
             
             if (pageText.includes(query)) {
-                const matches = [];
+                const matches: Array<{ spanIndex: number; startOffset: number; endOffset: number }> = [];
                 let searchIndex = 0;
 
                 while (searchIndex < pageText.length) {
@@ -713,7 +721,7 @@ class OptimizedPDFService {
 
         // This would require extending the LRU cache to support timestamp-based cleanup
         // For now, just log cache status
-        console.log('[OptimizedPDFService] Cache status:', this.getPerformanceMetrics());
+        if (this.DEBUG) console.debug('[OptimizedPDFService] Cache status:', this.getPerformanceMetrics());
     }
 
     getDocumentInfo(bookId: number): PDFDocumentData | null {
