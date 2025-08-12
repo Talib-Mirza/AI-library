@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     DATABASE_MAX_OVERFLOW: int = 10
     
     # Redis and Celery
-    REDIS_URL: str
+    REDIS_URL: Optional[str] = None
     
     # AI APIs
     OPENAI_API_KEY: str
