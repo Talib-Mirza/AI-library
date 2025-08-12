@@ -51,7 +51,7 @@ function App() {
   }, [])
 
   if (!GOOGLE_CLIENT_ID) {
-    console.error('Google Client ID is not configured. Please add VITE_GOOGLE_CLIENT_ID to your .env file!')
+    console.error('Google Client ID is not configured. Please add VITE_GOOGLE_CLIENT_ID to your .env file.')
   }
 
   return (
