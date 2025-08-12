@@ -3,6 +3,7 @@ import asyncio
 import os
 import sys
 from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.engine import make_url
 
 from alembic import context
 
@@ -75,10 +76,16 @@ async def run_async_migrations():
     and associate a connection with the context.
 
     """
+    # Determine if SSL is required (for remote DBs like Railway)
+    url = make_url(config.get_main_option("sqlalchemy.url"))
+    host = (url.host or "").lower()
+    require_ssl = host not in ("localhost", "127.0.0.1") and not host.endswith(".local") and not host.endswith(".internal")
+
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=None,
+        connect_args={"ssl": True} if require_ssl else {},
     )
 
     async with connectable.connect() as connection:
