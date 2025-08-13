@@ -22,6 +22,14 @@ const LoginPage = () => {
   const formRef = useRef<HTMLFormElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   
+  // Show toast if redirected after email verification
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('verified') === '1') {
+      toast.success('Email verified! You can now sign in.');
+    }
+  }, [location.search]);
+  
   // GSAP animations on mount
   useEffect(() => {
     const tl = gsap.timeline();
