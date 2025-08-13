@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prebuild": "node -e \"console.log('[BUILD ENV]', { VITE_API_URL: process.env.VITE_API_URL, VITE_GOOGLE_CLIENT_ID: process.env.VITE_GOOGLE_CLIENT_ID, NODE_ENV: process.env.NODE_ENV })\"",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
