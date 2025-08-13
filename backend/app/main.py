@@ -40,7 +40,16 @@ class GoogleOAuthSecurityMiddleware(BaseHTTPMiddleware):
 		]
 		response.headers["Content-Security-Policy"] = "; ".join(csp_policy)
 		
-		# Additional CORS headers for development
+		# Ensure CORS headers present
+		frontend_origin = settings.EFFECTIVE_FRONTEND_URL
+		if frontend_origin:
+			response.headers.setdefault("Access-Control-Allow-Origin", frontend_origin)
+			response.headers.setdefault("Vary", "Origin")
+			response.headers.setdefault("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+			response.headers.setdefault("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, X-Requested-With")
+			response.headers.setdefault("Access-Control-Allow-Credentials", "true")
+		
+		# Additional permissive headers during development
 		if settings.DEBUG:
 			response.headers["Access-Control-Allow-Origin"] = "*"
 			response.headers["Access-Control-Allow-Methods"] = "*"
