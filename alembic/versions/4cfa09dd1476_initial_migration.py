@@ -45,7 +45,6 @@ def upgrade() -> None:
         sa.Column('file_path', sa.String(length=255), nullable=False),
         sa.Column('file_type', sa.String(length=50), nullable=False),
         sa.Column('file_size', sa.Integer(), nullable=False),
-        sa.Column('cover_image_url', sa.String(length=255), nullable=True),
         sa.Column('is_processed', sa.Boolean(), nullable=False, server_default=sa.text('false')),
         sa.Column('processing_error', sa.Text(), nullable=True),
         sa.Column('page_count', sa.Integer(), nullable=True),

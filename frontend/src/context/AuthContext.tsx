@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import api from '../utils/axiosConfig';
 
+const BASE_URL = (import.meta as any)?.env?.VITE_API_URL || '/api';
+
 interface User {
   id: string;
   email: string;
@@ -61,7 +63,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const userId = localStorage.getItem('user_id');
         if (!refreshToken || !userId) return;
         try {
-          const res = await fetch('http://localhost:8000/api/auth/refresh', {
+          const res = await fetch(`${BASE_URL}/auth/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: Number(userId), refresh_token: refreshToken })
@@ -88,7 +90,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           const userId = localStorage.getItem('user_id');
           if (refreshToken && userId) {
             try {
-              const res = await fetch('http://localhost:8000/api/auth/refresh', {
+              const res = await fetch(`${BASE_URL}/auth/refresh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: Number(userId), refresh_token: refreshToken })
@@ -124,7 +126,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (token) {
         try {
           // Get user data from backend
-          const response = await fetch('http://localhost:8000/api/auth/me', {
+          const response = await fetch(`${BASE_URL}/auth/me`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -162,7 +164,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       formData.append('username', email);  // OAuth2 expects 'username' field
       formData.append('password', password);
 
-      const response = await fetch('http://localhost:8000/api/auth/login', {
+      const response = await fetch(`${BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -184,7 +186,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('refresh_token', data.refresh_token);
 
       // Get user data
-      const userResponse = await fetch('http://localhost:8000/api/auth/me', {
+      const userResponse = await fetch(`${BASE_URL}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${data.access_token}`
         }
@@ -212,7 +214,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsLoading(true);
     
     try {
-      const registerResponse = await fetch('http://localhost:8000/api/auth/register', {
+      const registerResponse = await fetch(`${BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -243,7 +245,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8000/api/auth/google', {
+      const response = await fetch(`${BASE_URL}/auth/google`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -261,7 +263,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('refresh_token', data.refresh_token);
 
       // Get user data
-      const userResponse = await fetch('http://localhost:8000/api/auth/me', {
+      const userResponse = await fetch(`${BASE_URL}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${data.access_token}`
         }
