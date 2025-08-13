@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
+const API_BASE = ((import.meta as any)?.env?.VITE_API_URL || '/api').replace(/\/$/, '')
+
 const GoogleOAuthDebug: React.FC = () => {
   const { googleLogin } = useAuth()
   const [debugInfo, setDebugInfo] = useState<any>({})
@@ -98,7 +100,7 @@ const GoogleOAuthDebug: React.FC = () => {
     addResult('🔗 Testing backend connection...')
     
     try {
-      const response = await fetch('/api/auth/google', {
+      const response = await fetch(`${API_BASE}/auth/google`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -4,6 +4,8 @@ import type { PDFDocumentProxy, PDFPageProxy, TextItem, TextMarkedContent } from
 import api from '../utils/axiosConfig';
 import { getAuthToken } from '../utils/auth';
 
+const API_BASE = ((import.meta as any)?.env?.VITE_API_URL || '/api').replace(/\/$/, '');
+
 export interface PDFImage {
     filename: string;
     path: string;
@@ -162,7 +164,7 @@ class RenderWorkerPool {
 }
 
 class OptimizedPDFService {
-    private baseUrl = 'http://localhost:8000/api/pdf';
+    private baseUrl = `${API_BASE}/pdf`;
     private documents: Map<string, PDFDocumentData> = new Map();
     private loadingPromises: Map<string, Promise<PDFDocumentData>> = new Map();
     private pdfBlobs: Map<string, string> = new Map();
@@ -635,7 +637,7 @@ class OptimizedPDFService {
      * Utility methods
      */
     getPDFUrl(bookId: number): string {
-        return `/api/books/${bookId}/pdf`;
+        return `${API_BASE}/books/${bookId}/pdf`;
     }
 
     private getBookIdFromDocument(documentData: PDFDocumentData): number | undefined {
