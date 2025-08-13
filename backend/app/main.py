@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -16,46 +16,54 @@ from app.core.config import settings
 # Custom middleware for Google OAuth security headers
 class GoogleOAuthSecurityMiddleware(BaseHTTPMiddleware):
 	async def dispatch(self, request: Request, call_next):
-		response = await call_next(request)
-		
-		# Build CSP with environment-aware connect-src
-		connect_sources = ["'self'", "blob:", "data:", "https://accounts.google.com/gsi/"]
-		if settings.DEBUG:
-			connect_sources.append("http://localhost:5173")
-		else:
-			# Add the configured frontend origin if present
-			if settings.EFFECTIVE_FRONTEND_URL:
-				connect_sources.append(settings.EFFECTIVE_FRONTEND_URL)
-		
-		csp_policy = [
-			"default-src 'self'",
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com/gsi/client",
-			"style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
-			"frame-src 'self' https://accounts.google.com/gsi/",
-			f"connect-src {' '.join(connect_sources)}",
-			"img-src 'self' data: blob:",
-			"font-src 'self' data:",
-			"media-src 'self' blob: data:",
-			"worker-src 'self' blob:"
-		]
-		response.headers["Content-Security-Policy"] = "; ".join(csp_policy)
-		
-		# Ensure CORS headers present
 		frontend_origin = settings.EFFECTIVE_FRONTEND_URL
-		if frontend_origin:
-			response.headers.setdefault("Access-Control-Allow-Origin", frontend_origin)
-			response.headers.setdefault("Vary", "Origin")
-			response.headers.setdefault("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-			response.headers.setdefault("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, X-Requested-With")
-			response.headers.setdefault("Access-Control-Allow-Credentials", "true")
 		
-		# Additional permissive headers during development
-		if settings.DEBUG:
-			response.headers["Access-Control-Allow-Origin"] = "*"
-			response.headers["Access-Control-Allow-Methods"] = "*"
-			response.headers["Access-Control-Allow-Headers"] = "*"
+		def _apply_headers(resp: Response) -> Response:
+			# Build CSP with environment-aware connect-src
+			connect_sources = ["'self'", "blob:", "data:", "https://accounts.google.com/gsi/"]
+			if settings.DEBUG:
+				connect_sources.append("http://localhost:5173")
+			else:
+				if settings.EFFECTIVE_FRONTEND_URL:
+					connect_sources.append(settings.EFFECTIVE_FRONTEND_URL)
+			csp_policy = [
+				"default-src 'self'",
+				"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com/gsi/client",
+				"style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
+				"frame-src 'self' https://accounts.google.com/gsi/",
+				f"connect-src {' '.join(connect_sources)}",
+				"img-src 'self' data: blob:",
+				"font-src 'self' data:",
+				"media-src 'self' blob: data:",
+				"worker-src 'self' blob:"
+			]
+			resp.headers["Content-Security-Policy"] = "; ".join(csp_policy)
+			# Ensure CORS headers present
+			if frontend_origin:
+				resp.headers.setdefault("Access-Control-Allow-Origin", frontend_origin)
+				resp.headers.setdefault("Vary", "Origin")
+				resp.headers.setdefault("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+				resp.headers.setdefault("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, X-Requested-With")
+				resp.headers.setdefault("Access-Control-Allow-Credentials", "true")
+			if settings.DEBUG:
+				resp.headers["Access-Control-Allow-Origin"] = "*"
+				resp.headers["Access-Control-Allow-Methods"] = "*"
+				resp.headers["Access-Control-Allow-Headers"] = "*"
+			return resp
 		
-		return response
+		# Handle preflight early
+		if request.method == "OPTIONS":
+			preflight = Response(status_code=204)
+			return _apply_headers(preflight)
+		
+		try:
+			response = await call_next(request)
+		except Exception:
+			# Ensure CORS even on error
+			response = JSONResponse({"detail": "Internal Server Error"}, status_code=500)
+			return _apply_headers(response)
+		
+		return _apply_headers(response)
 
 # Initialize Sentry for error monitoring (if configured)
 if settings.SENTRY_DSN:
@@ -91,13 +99,11 @@ cors_kwargs = dict(
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
-	# Additional headers for Google OAuth
 	expose_headers=["Cross-Origin-Opener-Policy", "Content-Security-Policy", "Access-Control-Allow-Origin"],
 )
 if allowed_origins:
 	cors_kwargs["allow_origins"] = allowed_origins
 else:
-	# Fallback: allow all Vercel preview domains in production
 	cors_kwargs["allow_origin_regex"] = r"https://.*vercel\.app"
 
 # Add CORS middleware with Google OAuth support
@@ -124,13 +130,11 @@ async def startup_event():
 # Create uploads directory if it doesn't exist
 uploads_path = settings.UPLOAD_DIR
 if not os.path.isabs(uploads_path):
-	# If relative path, make it relative to the backend directory
 	backend_dir = os.path.dirname(os.path.dirname(__file__))
 	uploads_path = os.path.join(backend_dir, uploads_path)
 os.makedirs(uploads_path, exist_ok=True)
-# Mount static file directories
 app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
-# Mount static files for parsed PDFs
+
 @app.get("/")
 async def health_check():
 	return {"status": "ok", "version": "0.1.0"}
