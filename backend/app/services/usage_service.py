@@ -32,6 +32,18 @@ def _period_bounds(dt: Optional[datetime] = None) -> Tuple[datetime, datetime]:
     return start, end
 
 
+def _zero_usage_dict() -> dict:
+    start, end = _period_bounds()
+    return {
+        "id": None,
+        "tts_minutes_used": 0,
+        "ai_queries_used": 0,
+        "book_uploads_used": 0,
+        "period_start": start,
+        "period_end": end,
+    }
+
+
 class UsageService:
     async def get_limits_for_user(self, user: User) -> dict:
         # Pro only if subscription is active/trialing AND tier is explicitly 'pro'
@@ -47,52 +59,60 @@ class UsageService:
     async def get_or_create_current_period(self, user_id: int) -> dict:
         start, end = _period_bounds()
         from sqlalchemy import text
-        async with async_session_factory() as session:
-            res = await session.execute(
-                text(
-                    """
-                    SELECT id, tts_minutes_used, ai_queries_used, book_uploads_used
-                    FROM user_usage_periods
-                    WHERE user_id = :uid AND period_start = :ps
-                    LIMIT 1
-                    """
-                ),
-                {"uid": user_id, "ps": start.date()},
-            )
-            row = res.first()
-            if row:
+        try:
+            async with async_session_factory() as session:
+                res = await session.execute(
+                    text(
+                        """
+                        SELECT id, tts_minutes_used, ai_queries_used, book_uploads_used
+                        FROM user_usage_periods
+                        WHERE user_id = :uid AND period_start = :ps
+                        LIMIT 1
+                        """
+                    ),
+                    {"uid": user_id, "ps": start.date()},
+                )
+                row = res.first()
+                if row:
+                    return {
+                        "id": row[0],
+                        "tts_minutes_used": row[1],
+                        "ai_queries_used": row[2],
+                        "book_uploads_used": row[3],
+                        "period_start": start,
+                        "period_end": end,
+                    }
+                ins = await session.execute(
+                    text(
+                        """
+                        INSERT INTO user_usage_periods (user_id, period_start, period_end, tts_minutes_used, ai_queries_used, book_uploads_used)
+                        VALUES (:uid, :ps, :pe, 0, 0, 0)
+                        RETURNING id, tts_minutes_used, ai_queries_used, book_uploads_used
+                        """
+                    ),
+                    {"uid": user_id, "ps": start.date(), "pe": end.date()},
+                )
+                new_row = ins.first()
+                await session.commit()
                 return {
-                    "id": row[0],
-                    "tts_minutes_used": row[1],
-                    "ai_queries_used": row[2],
-                    "book_uploads_used": row[3],
+                    "id": new_row[0],
+                    "tts_minutes_used": new_row[1],
+                    "ai_queries_used": new_row[2],
+                    "book_uploads_used": new_row[3],
                     "period_start": start,
                     "period_end": end,
                 }
-            ins = await session.execute(
-                text(
-                    """
-                    INSERT INTO user_usage_periods (user_id, period_start, period_end, tts_minutes_used, ai_queries_used, book_uploads_used)
-                    VALUES (:uid, :ps, :pe, 0, 0, 0)
-                    RETURNING id, tts_minutes_used, ai_queries_used, book_uploads_used
-                    """
-                ),
-                {"uid": user_id, "ps": start.date(), "pe": end.date()},
-            )
-            new_row = ins.first()
-            await session.commit()
-            return {
-                "id": new_row[0],
-                "tts_minutes_used": new_row[1],
-                "ai_queries_used": new_row[2],
-                "book_uploads_used": new_row[3],
-                "period_start": start,
-                "period_end": end,
-            }
+        except Exception as e:
+            # Fail-open if usage table is missing or any error occurs
+            print(f"[UsageService] get_or_create_current_period failed for user {user_id}: {e}")
+            return _zero_usage_dict()
 
     async def get_usage(self, user_id: int) -> dict:
-        period = await self.get_or_create_current_period(user_id)
-        return period
+        try:
+            return await self.get_or_create_current_period(user_id)
+        except Exception as e:
+            print(f"[UsageService] get_usage failed for user {user_id}: {e}")
+            return _zero_usage_dict()
 
     async def is_within_limit(self, user: User, feature: str) -> bool:
         try:

@@ -57,20 +57,24 @@ async def list_users(
     current_admin: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    user_service = UserService(db)
-    users, total = await user_service.get_all_users(skip=skip, limit=limit)
+    try:
+        user_service = UserService(db)
+        users, total = await user_service.get_all_users(skip=skip, limit=limit)
 
-    # Build enriched records with subscription info and usage stats
-    enriched: List[Dict[str, Any]] = []
-    for u in users:
-        enriched.append(await _enrich_user(u))
+        # Build enriched records with subscription info and usage stats
+        enriched: List[Dict[str, Any]] = []
+        for u in users:
+            enriched.append(await _enrich_user(u))
 
-    return {
-        "items": enriched,
-        "total": total,
-        "skip": skip,
-        "limit": limit,
-    }
+        return {
+            "items": enriched,
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+        }
+    except Exception as e:
+        print(f"[ADMIN] list_users failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch users")
 
 @router.post("/users")
 async def create_user(
