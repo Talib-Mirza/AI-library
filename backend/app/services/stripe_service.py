@@ -109,7 +109,8 @@ class StripeService:
         try:
             subs = stripe.Subscription.list(customer=customer_id, status='all', limit=10)
             for s in subs.auto_paging_iter():
-                if s.get('status') in ('active', 'trialing', 'incomplete', 'past_due', 'unpaid'):
+                if s.get('status') in ('active', 'trialing'):
+                    # Block only true active/trialing subs
                     raise HTTPException(status_code=400, detail='An active subscription already exists for this account')
         except HTTPException:
             raise

@@ -15,7 +15,7 @@ from app.core.config import settings
 
 # Custom middleware for Google OAuth security headers
 class GoogleOAuthSecurityMiddleware(BaseHTTPMiddleware):
-	async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next):
 		frontend_origin = settings.EFFECTIVE_FRONTEND_URL
 		
 		def _apply_headers(resp: Response) -> Response:
@@ -26,17 +26,17 @@ class GoogleOAuthSecurityMiddleware(BaseHTTPMiddleware):
 			else:
 				if settings.EFFECTIVE_FRONTEND_URL:
 					connect_sources.append(settings.EFFECTIVE_FRONTEND_URL)
-			csp_policy = [
-				"default-src 'self'",
-				"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com/gsi/client",
-				"style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
-				"frame-src 'self' https://accounts.google.com/gsi/",
+        csp_policy = [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com/gsi/client",
+            "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
+            "frame-src 'self' https://accounts.google.com/gsi/",
 				f"connect-src {' '.join(connect_sources)}",
-				"img-src 'self' data: blob:",
-				"font-src 'self' data:",
-				"media-src 'self' blob: data:",
-				"worker-src 'self' blob:"
-			]
+            "img-src 'self' data: blob:",
+            "font-src 'self' data:",
+            "media-src 'self' blob: data:",
+            "worker-src 'self' blob:"
+        ]
 			resp.headers["Content-Security-Policy"] = "; ".join(csp_policy)
 			# Ensure CORS headers present
 			if frontend_origin:
@@ -45,7 +45,7 @@ class GoogleOAuthSecurityMiddleware(BaseHTTPMiddleware):
 				resp.headers.setdefault("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
 				resp.headers.setdefault("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, X-Requested-With")
 				resp.headers.setdefault("Access-Control-Allow-Credentials", "true")
-			if settings.DEBUG:
+        if settings.DEBUG:
 				resp.headers["Access-Control-Allow-Origin"] = "*"
 				resp.headers["Access-Control-Allow-Methods"] = "*"
 				resp.headers["Access-Control-Allow-Headers"] = "*"
@@ -67,22 +67,22 @@ class GoogleOAuthSecurityMiddleware(BaseHTTPMiddleware):
 
 # Initialize Sentry for error monitoring (if configured)
 if settings.SENTRY_DSN:
-	sentry_sdk.init(
-		dsn=settings.SENTRY_DSN,
-		traces_sample_rate=0.1,
-		environment=settings.APP_ENV,
-	)
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        traces_sample_rate=0.1,
+        environment=settings.APP_ENV,
+    )
 
 # Initialize rate limiter
 limiter = Limiter(key_func=lambda request: request.client.host)
 
 # Initialize FastAPI application
 app = FastAPI(
-	title=settings.APP_NAME,
-	version="0.1.0",
-	description="AI-powered eLibrary SaaS platform",
-	docs_url="/api/docs" if settings.DEBUG else None,
-	redoc_url="/api/redoc" if settings.DEBUG else None,
+    title=settings.APP_NAME,
+    version="0.1.0",
+    description="AI-powered eLibrary SaaS platform",
+    docs_url="/api/docs" if settings.DEBUG else None,
+    redoc_url="/api/redoc" if settings.DEBUG else None,
 )
 
 # Add Google OAuth security middleware first
@@ -96,10 +96,10 @@ if not settings.DEBUG:
 
 # Prepare CORS kwargs
 cors_kwargs = dict(
-	allow_credentials=True,
-	allow_methods=["*"],
-	allow_headers=["*"],
-	expose_headers=["Cross-Origin-Opener-Policy", "Content-Security-Policy", "Access-Control-Allow-Origin"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Cross-Origin-Opener-Policy", "Content-Security-Policy", "Access-Control-Allow-Origin"],
 )
 if allowed_origins:
 	cors_kwargs["allow_origins"] = allowed_origins
@@ -120,21 +120,21 @@ app.include_router(api_router, prefix="/api")
 # Initialize RAG service on startup
 @app.on_event("startup")
 async def startup_event():
-	from app.services.faiss_rag_service import faiss_rag_service
-	success = faiss_rag_service.initialize()
-	if success:
+    from app.services.faiss_rag_service import faiss_rag_service
+    success = faiss_rag_service.initialize()
+    if success:
 		print("FAISS RAG service initialized successfully")
-	else:
+    else:
 		print("FAISS RAG service initialization failed")
 
 # Create uploads directory if it doesn't exist
 uploads_path = settings.UPLOAD_DIR
 if not os.path.isabs(uploads_path):
-	backend_dir = os.path.dirname(os.path.dirname(__file__))
-	uploads_path = os.path.join(backend_dir, uploads_path)
+    backend_dir = os.path.dirname(os.path.dirname(__file__))
+    uploads_path = os.path.join(backend_dir, uploads_path)
 os.makedirs(uploads_path, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
 
 @app.get("/")
 async def health_check():
-	return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": "0.1.0"}
