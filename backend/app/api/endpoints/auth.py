@@ -480,7 +480,7 @@ async def verify_email(token: str) -> Any:
                 if db_user:
                     db_user.is_verified = True
                     await session.commit()
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard?verified=1", status_code=307)
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?verified=1", status_code=307)
     except (JWTError, Exception):
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?verify_error=1", status_code=307)
 
