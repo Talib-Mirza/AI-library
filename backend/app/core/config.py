@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     MAIL_FROM_NAME: str = "Thesyx"
 
     # URLs
-    BACKEND_URL: str = "http://localhost:8000"
-    FRONTEND_URL: str = "http://localhost:5173"
+    BACKEND_URL: str = "https://thesyx.up.railway.app"
+    FRONTEND_URL: str = "https://thesyx.vercel.app"
     # Accept alternate env var names without validation errors
     FRONTEND_ORIGIN: Optional[str] = None
     BACKEND_ORIGIN: Optional[str] = None
