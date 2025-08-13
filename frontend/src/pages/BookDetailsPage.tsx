@@ -560,7 +560,7 @@ const BookDetailsPage = () => {
                   </motion.button>
                   
                   <motion.a 
-                    href={`/api/books/${book.id}/content`}
+                    href={`${(import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, '')}/books/${book.id}/content`}
                     download={`${book.title}.${book.fileType}`}
                     onClick={handleDownload}
                     whileHover={{ scale: 1.05, y: -2 }}

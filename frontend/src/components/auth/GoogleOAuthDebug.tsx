@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
-const API_BASE = ((import.meta as any)?.env?.VITE_API_URL || '/api').replace(/\/$/, '')
+const API_BASE = ((import.meta as any)?.env?.VITE_API_URL).replace(/\/$/, '')
 
 const GoogleOAuthDebug: React.FC = () => {
   const { googleLogin } = useAuth()

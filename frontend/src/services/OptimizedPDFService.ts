@@ -4,7 +4,7 @@ import type { PDFDocumentProxy, PDFPageProxy, TextItem, TextMarkedContent } from
 import api from '../utils/axiosConfig';
 import { getAuthToken } from '../utils/auth';
 
-const API_BASE = ((import.meta as any)?.env?.VITE_API_URL || '/api').replace(/\/$/, '');
+const API_BASE = ((import.meta as any)?.env?.VITE_API_URL).replace(/\/$/, '');
 
 export interface PDFImage {
     filename: string;

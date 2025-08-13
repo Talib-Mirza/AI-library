@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getAuthToken } from './auth';
 
-const baseURL = (import.meta as any)?.env?.VITE_API_URL || '/api';
+const baseURL = (import.meta as any)?.env?.VITE_API_URL;
 
 // Create axios instance
 const api = axios.create({
