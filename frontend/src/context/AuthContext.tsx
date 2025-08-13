@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import api from '../utils/axiosConfig';
 
-const BASE_URL = (import.meta as any)?.env?.VITE_API_URL;
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 interface User {
   id: string;
