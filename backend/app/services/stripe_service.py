@@ -127,6 +127,20 @@ class StripeService:
             pass
         if not self.price_id:
             raise HTTPException(status_code=500, detail='Stripe price not configured')
+        # Validate price exists and log mode details
+        try:
+            price_obj = stripe.Price.retrieve(self.price_id)
+            try:
+                print(f"[Stripe] Price ok id={price_obj.id} active={price_obj.active} livemode={price_obj.livemode}")
+            except Exception:
+                pass
+        except Exception as e:
+            try:
+                print(f"[Stripe] Invalid price id {self.price_id}: {e}")
+            except Exception:
+                pass
+            raise HTTPException(status_code=400, detail=f"Invalid Stripe price id: {self.price_id}")
+
         customer_id = await self._get_or_create_customer(user)
         # Prevent multiple concurrent subscriptions
         try:
@@ -155,16 +169,34 @@ class StripeService:
             except Exception:
                 pass
             raise HTTPException(status_code=500, detail=f"Stripe subscription check failed: {e}")
-        session = stripe.checkout.Session.create(
-            mode='subscription',
-            customer=customer_id,
-            line_items=[{"price": self.price_id, "quantity": 1}],
-            success_url=f"{self.frontend_origin}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{self.frontend_origin}/billing/cancel",
-            metadata={"user_id": str(user.id)},
-            # Restrict to card-only to disable Amazon Pay, Cash App Pay, Klarna, etc.
-            payment_method_types=["card"],
-        )
+
+        success_url = f"{self.frontend_origin}/billing/success?session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{self.frontend_origin}/billing/cancel"
+        try:
+            session = stripe.checkout.Session.create(
+                mode='subscription',
+                customer=customer_id,
+                line_items=[{"price": self.price_id, "quantity": 1}],
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata={"user_id": str(user.id)},
+                payment_method_types=["card"],
+            )
+        except stripe.error.StripeError as e:
+            # Capture clear message for common issues (price mismatch, invalid URLs, mode mismatch)
+            message = getattr(e, 'user_message', None) or str(e)
+            try:
+                print(f"[Stripe] Checkout create error (StripeError): {message} type={e.__class__.__name__} price={self.price_id} success_url={success_url}")
+            except Exception:
+                pass
+            raise HTTPException(status_code=400, detail=f"Stripe error: {message}")
+        except Exception as e:
+            try:
+                print(f"[Stripe] Checkout create error (Exception): {e} price={self.price_id} success_url={success_url}")
+            except Exception:
+                pass
+            raise HTTPException(status_code=500, detail=f"Checkout create failed: {e}")
+
         try:
             print(f"[Stripe] Created checkout session id={session.id} url={session.url}")
         except Exception:
