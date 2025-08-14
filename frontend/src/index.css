@@ -22,6 +22,8 @@ html, body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;            /* Prevent horizontal scroll */
+  overscroll-behavior-x: contain; /* Avoid sideways rubber-banding showing white */
 }
 
 /* Dark mode transitions */
@@ -40,11 +42,7 @@ html.light {
 }
 
 /* Prevent layout shift during theme changes */
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
+/* #root styles moved above to add overflow-x hidden */
 
 /* From Uiverse.io by mrhyddenn */ 
 .download-button {

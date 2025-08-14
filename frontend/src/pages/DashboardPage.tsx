@@ -591,16 +591,16 @@ const DashboardPage = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl rounded-3xl shadow-2xl max-w-lg w-full p-8 border border-white/20 dark:border-gray-700/30 relative overflow-hidden"
+              className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-8 border border-white/20 dark:border-gray-700/30 relative overflow-hidden max-h-[85vh] overflow-y-auto"
             >
               {/* Glass effect overlay */}
               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent rounded-3xl"></div>
               
               <div className="relative z-10">
-                <div className="flex justify-between items-center mb-8">
+                <div className="flex justify-between items-center mb-6 sm:mb-8">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Upload New Book</h2>
-                    <p className="text-gray-600 dark:text-gray-400">Add a new book to your digital library</p>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 sm:mb-2">Upload New Book</h2>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">Add a new book to your digital library</p>
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.1, rotate: 90 }}
@@ -614,7 +614,7 @@ const DashboardPage = () => {
                   </motion.button>
                 </div>
                 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
                   <div>
                     <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                       Title *

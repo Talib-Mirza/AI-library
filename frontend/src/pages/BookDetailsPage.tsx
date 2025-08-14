@@ -7,7 +7,6 @@ import bookService from '../services/BookService';
 import type { Book as BookType } from '../services/BookService';
 import type { AskQuestionResponse } from '../services/RagService';
 import { getAuthToken, ensureDemoToken } from '../utils/auth';
-import '../index.css'; // Import global styles to ensure download button styles are available
 import ModernPDFViewer from '../components/pdf/ModernPDFViewer';
 import type { PDFTextSpan } from '../services/OptimizedPDFService';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -312,39 +311,8 @@ const BookDetailsPage = () => {
     setCurrentPage(pageNumber);
   };
   
-  // Update the download handler
-  const handleDownload = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    if (!book) return;
+  // Download functionality removed per request
 
-    try {
-      const { data, type, filename } = await bookService.getBookContent(book.id);
-      
-      // Create a blob URL from the response data
-      const blob = new Blob([data], { type });
-      const url = window.URL.createObjectURL(blob);
-      
-      // Create a temporary link and click it
-      const link = document.createElement('a');
-      link.href = url;
-      // Use original filename if available, otherwise fallback to book title
-      link.download = filename || `${book.title}.${book.fileType}`;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Clean up
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      console.error('Error downloading file:', error);
-      if (error.message?.includes('Unauthorized')) {
-        toast.error('Session expired. Please log in again.');
-      } else {
-        toast.error('Failed to download file. Please try again.');
-      }
-    }
-  };
-  
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20 flex items-center justify-center">
@@ -558,23 +526,6 @@ const BookDetailsPage = () => {
                     </span>
                     <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                   </motion.button>
-                  
-                  <motion.a 
-                    href={`${(import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, '')}/books/${book.id}/content`}
-                    download={`${book.title}.${book.fileType}`}
-                    onClick={handleDownload}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="group relative px-6 py-3 bg-white hover:bg-gray-50 text-blue-700 rounded-2xl font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden"
-                  >
-                    <span className="relative z-10 flex items-center">
-                      <svg className="w-5 h-5 mr-2 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Download
-                    </span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-blue-600/10 to-blue-600/0 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                  </motion.a>
                 </motion.div>
               </div>
             </div>
