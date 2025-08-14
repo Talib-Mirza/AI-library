@@ -58,7 +58,7 @@ def upgrade() -> None:
     op.alter_column(
         'books',
         'file_type',
-        existing_type=sa.VARCHAR(length=50),
+               existing_type=sa.VARCHAR(length=50),
         type_=filetype_enum,
         existing_nullable=False,
         postgresql_using="UPPER(file_type)::filetype",

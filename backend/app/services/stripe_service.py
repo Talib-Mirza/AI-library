@@ -18,9 +18,27 @@ class StripeService:
         self.webhook_secret = getattr(settings, 'STRIPE_WEBHOOK_SECRET', None)
 
     async def _get_or_create_customer(self, user: User) -> str:
+        # If we have a stored customer id, verify it still exists (handles Stripe test data resets)
         if user.stripe_customer_id:
-            return user.stripe_customer_id
-        # Try to find existing Stripe customer by email to avoid duplicates
+            try:
+                stripe.Customer.retrieve(user.stripe_customer_id)
+                return user.stripe_customer_id
+            except Exception as e:
+                # If the stored id is invalid/missing in Stripe, create a new one and update DB
+                if 'No such customer' in str(e):
+                    try:
+                        sc = stripe.Customer.create(email=user.email, name=user.full_name)
+                        new_id = sc.id
+                        async with async_session_factory() as session:
+                            db_user = await session.get(User, user.id)
+                            db_user.stripe_customer_id = new_id
+                            await session.commit()
+                        return new_id
+                    except Exception as ce:
+                        raise HTTPException(status_code=500, detail=f"Stripe customer recreate error: {ce}")
+                # Other errors
+                raise HTTPException(status_code=500, detail=f"Stripe customer retrieve error: {e}")
+        # No stored id → find by email or create new
         try:
             existing = stripe.Customer.list(email=user.email, limit=1)
             if existing and existing.data:
