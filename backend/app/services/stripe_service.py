@@ -102,19 +102,40 @@ class StripeService:
             pass
 
     async def create_checkout_session(self, user: User) -> str:
+        # Safe, temporary debug logging
+        try:
+            print(f"[Stripe] Checkout attempt user_id={user.id} email={user.email} price_id={self.price_id} frontend={self.frontend_origin}")
+        except Exception:
+            pass
         if not self.price_id:
             raise HTTPException(status_code=500, detail='Stripe price not configured')
         customer_id = await self._get_or_create_customer(user)
         # Prevent multiple concurrent subscriptions
         try:
             subs = stripe.Subscription.list(customer=customer_id, status='all', limit=10)
+            statuses = []
             for s in subs.auto_paging_iter():
-                if s.get('status') in ('active', 'trialing'):
+                sid = s.get('id')
+                st = s.get('status')
+                statuses.append((sid, st))
+                if st in ('active', 'trialing'):
                     # Block only true active/trialing subs
+                    try:
+                        print(f"[Stripe] Blocking checkout: existing subscription(s) for customer {customer_id}: {statuses}")
+                    except Exception:
+                        pass
                     raise HTTPException(status_code=400, detail='An active subscription already exists for this account')
+            try:
+                print(f"[Stripe] No active/trialing subs found for customer {customer_id}. Existing statuses: {statuses}")
+            except Exception:
+                pass
         except HTTPException:
             raise
         except Exception as e:
+            try:
+                print(f"[Stripe] Subscription check failed for customer {customer_id}: {e}")
+            except Exception:
+                pass
             raise HTTPException(status_code=500, detail=f"Stripe subscription check failed: {e}")
         session = stripe.checkout.Session.create(
             mode='subscription',
@@ -126,6 +147,10 @@ class StripeService:
             # Restrict to card-only to disable Amazon Pay, Cash App Pay, Klarna, etc.
             payment_method_types=["card"],
         )
+        try:
+            print(f"[Stripe] Created checkout session id={session.id} url={session.url}")
+        except Exception:
+            pass
         return session.url
 
     async def create_billing_portal_session(self, user: User) -> str:
@@ -226,7 +251,7 @@ class StripeService:
                     send_email(
                         subject="Welcome to Thesyx Pro",
                         recipients=[db_user.email],
-                        html_body=build_subscription_welcome_email(db_user.full_name),
+                        html_body=build_subscription_welcome_email(user.full_name),
                     )
                 except Exception:
                     pass
