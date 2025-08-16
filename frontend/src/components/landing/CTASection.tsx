@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import gsap from 'gsap';
@@ -11,14 +11,11 @@ const CTASection = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const subtitleRef = useRef<HTMLParagraphElement>(null);
-  const primaryButtonRef = useRef<HTMLAnchorElement>(null);
-  const secondaryButtonRef = useRef<HTMLAnchorElement>(null);
-  const featuresRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLAnchorElement>(null);
   const statsRef = useRef<HTMLDivElement>(null);
-  const orbitingShape1Ref = useRef<HTMLDivElement>(null);
-  const orbitingShape2Ref = useRef<HTMLDivElement>(null);
-  const orbitingShape3Ref = useRef<HTMLDivElement>(null);
-  const backgroundShapeRef = useRef<HTMLDivElement>(null);
+  const triggersRef = useRef<ScrollTrigger[]>([]);
+  
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     if (!sectionRef.current) return;
@@ -26,183 +23,99 @@ const CTASection = () => {
     const section = sectionRef.current;
     const title = titleRef.current;
     const subtitle = subtitleRef.current;
-    const primaryButton = primaryButtonRef.current;
-    const secondaryButton = secondaryButtonRef.current;
-    const features = featuresRef.current;
+    const button = buttonRef.current;
     const stats = statsRef.current;
-    const orbitingShape1 = orbitingShape1Ref.current;
-    const orbitingShape2 = orbitingShape2Ref.current;
-    const orbitingShape3 = orbitingShape3Ref.current;
-    const backgroundShape = backgroundShapeRef.current;
 
     // Initial setup
-    gsap.set([title, subtitle, primaryButton, secondaryButton, features, stats], {
+    gsap.set([title, subtitle, button, stats], {
       opacity: 0,
-      y: 80
+      y: 50,
+      scale: 0.9
     });
 
-    gsap.set([orbitingShape1, orbitingShape2, orbitingShape3], {
-      scale: 0,
-      rotation: 0
-    });
-
-    gsap.set(backgroundShape, {
-      scale: 0.5,
-      opacity: 0
-    });
-
-    // Main animation sequence
-    ScrollTrigger.create({
+    // Main entrance animation
+    const entranceTrigger = ScrollTrigger.create({
       trigger: section,
-      start: "top 85%",
-      end: "bottom 15%",
+      start: "top 80%",
       onEnter: () => {
-        const masterTL = gsap.timeline();
-
-        // Background shape animation
-        masterTL.to(backgroundShape, {
-          scale: 1,
-          opacity: 0.6,
-          duration: 2,
-          ease: "power2.out"
-        })
-
-        // Content animations
-        .to(title, {
+        setIsVisible(true);
+        
+        const tl = gsap.timeline();
+        tl.to(title, {
           opacity: 1,
           y: 0,
+          scale: 1,
           duration: 1.2,
           ease: "back.out(1.7)"
-        }, "-=1.5")
-
+        })
         .to(subtitle, {
           opacity: 1,
           y: 0,
+          scale: 1,
           duration: 1,
           ease: "power2.out"
         }, "-=0.8")
-
-        .to([primaryButton, secondaryButton], {
+        .to(button, {
           opacity: 1,
           y: 0,
+          scale: 1,
           duration: 0.8,
-          ease: "back.out(1.7)",
-          stagger: 0.2
-        }, "-=0.5")
-
-        .to(features, {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power2.out"
-        }, "-=0.4")
-
+          ease: "back.out(1.7)"
+        }, "-=0.6")
         .to(stats, {
           opacity: 1,
           y: 0,
+          scale: 1,
           duration: 0.8,
           ease: "power2.out"
-        }, "-=0.6")
-
-        // Orbiting shapes
-        .to([orbitingShape1, orbitingShape2, orbitingShape3], {
-          scale: 1,
-          duration: 1,
-          ease: "back.out(1.7)",
-          stagger: 0.1
-        }, "-=1");
-      }
+        }, "-=0.4");
+      },
+      once: true
     });
 
-    // Continuous orbiting animations
-    if (orbitingShape1) {
-      gsap.to(orbitingShape1, {
-        rotation: 360,
-        duration: 20,
-        repeat: -1,
-        ease: "none",
-        transformOrigin: "50% 50%"
+    // Floating animation for the button
+    if (button) {
+      gsap.to(button, {
+        y: -10,
+        duration: 2,
+        ease: "power2.inOut",
+        yoyo: true,
+        repeat: -1
       });
     }
 
-    if (orbitingShape2) {
-      gsap.to(orbitingShape2, {
-        rotation: -360,
-        duration: 25,
-        repeat: -1,
-        ease: "none",
-        transformOrigin: "50% 50%"
-      });
-    }
-
-    if (orbitingShape3) {
-      gsap.to(orbitingShape3, {
-        rotation: 360,
-        duration: 30,
-        repeat: -1,
-        ease: "none",
-        transformOrigin: "50% 50%"
-      });
-    }
-
-    // Parallax scrolling effect
-    ScrollTrigger.create({
+    // Parallax effect
+    const parallaxTrigger = ScrollTrigger.create({
       trigger: section,
       start: "top bottom",
       end: "bottom top",
-      scrub: 1,
+      scrub: true,
       onUpdate: (self) => {
         const progress = self.progress;
+        const moveY = progress * -50;
         
-        if (backgroundShape) {
-          gsap.set(backgroundShape, {
-            y: progress * 100,
-            rotation: progress * 45
-          });
-        }
-        
-        // Parallax for orbiting shapes
-        if (orbitingShape1) {
-          gsap.set(orbitingShape1, {
-            y: progress * -50
-          });
-        }
-        
-        if (orbitingShape2) {
-          gsap.set(orbitingShape2, {
-            y: progress * 30
-          });
-        }
-        
-        if (orbitingShape3) {
-          gsap.set(orbitingShape3, {
-            y: progress * -20
-          });
-        }
+        if (title) gsap.set(title, { y: moveY * 0.5 });
+        if (subtitle) gsap.set(subtitle, { y: moveY * 0.3 });
+        if (button) gsap.set(button, { y: moveY * 0.4 });
       }
     });
 
-    // Button hover animations
-    const animateButton = (button: HTMLElement, isHover: boolean) => {
+    // Enhanced button hover effects
+    const buttons = section.querySelectorAll('.cta-button, .secondary-button');
+    
+    const animateButton = (button: Element, isHover: boolean) => {
       gsap.to(button, {
         scale: isHover ? 1.05 : 1,
+        rotationY: isHover ? 5 : 0,
+        boxShadow: isHover ? 
+          '0 20px 40px rgba(59, 130, 246, 0.4), 0 15px 25px rgba(0, 0, 0, 0.1)' : 
+          '0 10px 25px rgba(59, 130, 246, 0.2), 0 5px 10px rgba(0, 0, 0, 0.1)',
         duration: 0.3,
         ease: "power2.out"
       });
-      
-      const glow = button.querySelector('.glow');
-      if (glow) {
-        gsap.to(glow, {
-          opacity: isHover ? 1 : 0.3,
-          scale: isHover ? 1.2 : 1,
-          duration: 0.3,
-          ease: "power2.out"
-        });
-      }
     };
 
-    const buttons = [primaryButton, secondaryButton].filter(Boolean);
-    buttons.forEach(button => {
+    buttons.forEach((button) => {
       if (button) {
         button.addEventListener('mouseenter', () => animateButton(button, true));
         button.addEventListener('mouseleave', () => animateButton(button, false));
@@ -229,15 +142,20 @@ const CTASection = () => {
       });
     };
 
-    ScrollTrigger.create({
+    const statsTrigger = ScrollTrigger.create({
       trigger: stats,
       start: "top 80%",
       onEnter: countUpStats,
       once: true
     });
 
+    // Store our triggers
+    triggersRef.current = [entranceTrigger, parallaxTrigger, statsTrigger];
+
     return () => {
-      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+      // Only clean up this component's triggers
+      triggersRef.current.forEach(trigger => trigger.kill());
+      triggersRef.current = [];
       
       // Clean up event listeners
       buttons.forEach(button => {
@@ -252,134 +170,111 @@ const CTASection = () => {
   return (
     <section 
       ref={sectionRef}
-      className="relative min-h-screen py-24 flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-purple-950 overflow-hidden"
+      className="relative min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center overflow-hidden"
     >
-      {/* Animated Background Shape */}
-      <div 
-        ref={backgroundShapeRef}
-        className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-pink-600/20 blur-3xl"
-      />
+      {/* Animated background elements */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-500 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-indigo-500/20 to-pink-500/20 rounded-full blur-3xl"></div>
+      </div>
 
-      {/* Orbiting Decorative Shapes */}
-      <div 
-        ref={orbitingShape1Ref}
-        className="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-cyan-400/20 to-blue-500/20 rounded-3xl"
-        style={{ transformOrigin: "center center" }}
-      />
-      <div 
-        ref={orbitingShape2Ref}
-        className="absolute top-40 right-32 w-24 h-24 bg-gradient-to-br from-purple-400/20 to-pink-500/20 rounded-full"
-        style={{ transformOrigin: "center center" }}
-      />
-      <div 
-        ref={orbitingShape3Ref}
-        className="absolute bottom-32 left-40 w-20 h-20 bg-gradient-to-br from-green-400/20 to-emerald-500/20 rounded-2xl"
-        style={{ transformOrigin: "center center" }}
-      />
+      {/* Floating particles */}
+      <div className="absolute inset-0 overflow-hidden">
+        {[...Array(15)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-2 h-2 bg-white/30 rounded-full animate-pulse"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              animationDuration: `${2 + Math.random() * 3}s`
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Main Content */}
-      <div className="relative z-10 max-w-6xl mx-auto px-8 md:px-16 lg:px-24 text-center">
-        
-        {/* Hero Title */}
+      {/* Main content */}
+      <div className="relative z-10 text-center px-8 md:px-16 lg:px-24 max-w-6xl mx-auto">
+        {/* Main headline */}
         <h2 
           ref={titleRef}
-          className="text-5xl md:text-6xl lg:text-7xl font-black mb-8 leading-tight"
+          className="text-6xl md:text-8xl lg:text-9xl font-black mb-8 text-white leading-none"
         >
-          <span className="bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent">
-            Be Among the
-          </span>
+          Ready to
           <br />
           <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-            First to Experience
+            Transform
           </span>
           <br />
-          <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-            AI-Powered Reading
-          </span>
+          Your Reading?
         </h2>
 
         {/* Subtitle */}
         <p 
           ref={subtitleRef}
-          className="text-xl md:text-2xl lg:text-3xl mb-12 text-gray-300 max-w-4xl mx-auto leading-relaxed"
+          className="text-xl md:text-2xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed"
         >
-          Explore Thesyx: AI chat for your documents and intelligent text-to-speech in a modern reading experience.
+          Join thousands of readers who have revolutionized their document experience with AI-powered insights and seamless interaction.
         </p>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
+        {/* CTA Button */}
+        <div className="mb-16">
           <Link
-            ref={primaryButtonRef}
+            ref={buttonRef}
             to={isAuthenticated ? "/dashboard" : "/register"}
-            className="group relative"
+            className="cta-button inline-flex items-center justify-center px-12 py-6 text-xl font-bold text-white bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 transform transition-all duration-300 shadow-2xl hover:shadow-3xl group relative overflow-hidden"
           >
-            <div className="glow absolute -inset-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full blur-lg opacity-30 group-hover:opacity-100 transition-all duration-300" />
-            <div className="relative px-12 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white text-xl font-bold rounded-full transition-all duration-300 hover:shadow-2xl">
-              {isAuthenticated ? "Enter Dashboard" : "Get Started"}
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            </div>
-          </Link>
-
-          <Link
-            ref={secondaryButtonRef}
-            to="/use-cases"
-            className="group relative"
-          >
-            <div className="glow absolute -inset-4 bg-gradient-to-r from-gray-500 to-gray-600 rounded-full blur-lg opacity-30 group-hover:opacity-100 transition-all duration-300" />
-            <div className="relative px-12 py-4 bg-transparent border-2 border-gray-300 text-gray-300 text-xl font-semibold rounded-full transition-all duration-300 hover:border-white hover:text-white hover:shadow-2xl">
-              See Use Cases
-            </div>
+            <span className="absolute inset-0 bg-gradient-to-r from-white/20 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+            <span className="relative z-10 flex items-center">
+              {isAuthenticated ? 'Go to Dashboard' : 'Start Free Trial'}
+              <svg className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </span>
           </Link>
         </div>
 
-        {/* Highlights */}
+        {/* Stats section */}
         <div 
-          ref={featuresRef}
-          className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16"
+          ref={statsRef}
+          className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 max-w-4xl mx-auto"
         >
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
-            <div className="w-12 h-12 mx-auto mb-4 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">AI Answers</h3>
-            <p className="text-gray-300">Ask questions about your PDFs and get grounded, page-aware responses</p>
+          <div className="text-center">
+            <div className="stat-number text-4xl md:text-6xl font-black text-white mb-2" data-target="10000">0</div>
+            <div className="text-gray-400 text-lg font-medium">Active Users</div>
           </div>
-
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
-            <div className="w-12 h-12 mx-auto mb-4 bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">Quick Setup</h3>
-            <p className="text-gray-300">Upload a PDF and start chatting or listening within seconds</p>
+          <div className="text-center">
+            <div className="stat-number text-4xl md:text-6xl font-black text-white mb-2" data-target="50000">0</div>
+            <div className="text-gray-400 text-lg font-medium">Documents Processed</div>
           </div>
-
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
-            <div className="w-12 h-12 mx-auto mb-4 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">TTS Controls</h3>
-            <p className="text-gray-300">Fine-tune speed, pitch, and voice for comfortable listening</p>
+          <div className="text-center">
+            <div className="stat-number text-4xl md:text-6xl font-black text-white mb-2" data-target="99">0</div>
+            <div className="text-gray-400 text-lg font-medium">% Satisfaction Rate</div>
           </div>
         </div>
 
-        {/* Removed stats block */}
-
-        {/* Launch Badge */}
-        <div className="mt-12 inline-flex items-center space-x-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-400/30 px-6 py-3 rounded-full">
-          <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
-          <span className="text-green-300 font-semibold">🚀 Now Live - Launch Week Special!</span>
-          <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+        {/* Secondary CTA */}
+        <div className="mt-16">
+          <Link
+            to="/pricing"
+            className="secondary-button inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white border-2 border-white/30 rounded-xl hover:border-white/60 hover:bg-white/10 transform transition-all duration-300"
+          >
+            View Pricing Plans
+            <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
       </div>
 
-      {/* Bottom gradient fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-950 to-transparent" />
+      {/* Bottom decorative elements */}
+      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/20 to-transparent"></div>
+      
+      {/* Corner decorations */}
+      <div className="absolute top-10 right-10 w-20 h-20 border-2 border-white/20 rounded-full animate-spin" style={{ animationDuration: '20s' }}></div>
+      <div className="absolute bottom-10 left-10 w-16 h-16 border-2 border-white/20 rounded-lg animate-pulse"></div>
     </section>
   );
 };

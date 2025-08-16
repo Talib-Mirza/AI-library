@@ -18,6 +18,8 @@ const ImageCollageSection = () => {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
 
+  const isDev = (import.meta as any)?.env?.MODE === 'development';
+
   useLayoutEffect(() => {
     const section = sectionRef.current;
     const container = containerRef.current;
@@ -35,7 +37,6 @@ const ImageCollageSection = () => {
     if (!section || !container) return;
 
     const ctx = gsap.context(() => {
-      // Initial states
       gsap.set([title, subtitle, card1, card2, card3, status], {
         opacity: 0,
         y: 100,
@@ -47,33 +48,54 @@ const ImageCollageSection = () => {
       gsap.set([decorative1, decorative2, decorative3], { scale: 0, rotation: 0, opacity: 0 });
       gsap.set(progressBar, { scaleX: 0, transformOrigin: 'left center' });
 
+      const mainEl = document.querySelector('main') as HTMLElement | null;
+      const htmlEl = document.documentElement as HTMLElement;
+      let originalSnap: string | null = null;
+      let originalScrollBehavior: string | null = null;
+
       const tl = gsap.timeline({
         scrollTrigger: {
           id: 'image-collage',
           trigger: section,
           start: 'top top',
-          end: () => '+=' + Math.round(window.innerHeight * 1.5),
+          end: () => '+=' + Math.round(window.innerHeight * 2.5),
           pin: true,
           pinReparent: true,
-          pinSpacing: true,
-          scrub: 0.5,
+          pinSpacing: false,
+          scrub: 0.6,
           anticipatePin: 1,
           invalidateOnRefresh: true,
+          refreshPriority: 1,
+          markers: isDev,
+          onToggle: (self) => {
+            if (self.isActive) {
+              if (mainEl) {
+                originalSnap = mainEl.style.scrollSnapType;
+                mainEl.style.scrollSnapType = 'none';
+              }
+              originalScrollBehavior = htmlEl.style.scrollBehavior;
+              htmlEl.style.scrollBehavior = 'auto';
+            } else {
+              if (mainEl) {
+                if (originalSnap !== null) mainEl.style.scrollSnapType = originalSnap;
+                else mainEl.style.removeProperty('scroll-snap-type');
+              }
+              if (originalScrollBehavior !== null) htmlEl.style.scrollBehavior = originalScrollBehavior;
+              else htmlEl.style.removeProperty('scroll-behavior');
+            }
+          },
           onUpdate: (self) => gsap.set(progressBar, { scaleX: self.progress }),
-          onLeave: (self) => self.disable(), // ensure unpin when past end
-          onLeaveBack: (self) => self.disable(), // ensure unpin when before start
         },
       });
 
-      tl.to(title, { opacity: 1, y: 0, visibility: 'visible', duration: 1.5, ease: 'power2.out' })
-        .to(subtitle, { opacity: 1, y: 0, visibility: 'visible', duration: 1.2, ease: 'power2.out' }, '+=0.3')
-        .to([decorative1, decorative2, decorative3], { scale: 1, opacity: 1, rotation: 360, duration: 1.2, ease: 'back.out(1.7)', stagger: 0.2 }, '+=0.2')
-        .to(card1, { opacity: 1, visibility: 'visible', x: 0, y: 0, rotation: 0, scale: 1, duration: 1.8, ease: 'power2.out' }, '+=0.3')
-        .to(card2, { opacity: 1, visibility: 'visible', x: 0, y: 0, rotation: 0, scale: 1, duration: 1.8, ease: 'power2.out' }, '+=0.2')
-        .to(card3, { opacity: 1, visibility: 'visible', x: 0, y: 0, rotation: 0, scale: 1, duration: 1.8, ease: 'power2.out' }, '+=0.2')
-        .to(status, { opacity: 1, y: 0, visibility: 'visible', duration: 0.8, ease: 'power2.out' }, '+=0.1');
+      tl.to(title, { opacity: 1, y: 0, visibility: 'visible', duration: 1.1, ease: 'power2.out' })
+        .to(subtitle, { opacity: 1, y: 0, visibility: 'visible', duration: 0.9, ease: 'power2.out' }, '+=0.15')
+        .to([decorative1, decorative2, decorative3], { scale: 1, opacity: 1, rotation: 360, duration: 0.9, ease: 'back.out(1.7)', stagger: 0.12 }, '+=0.1')
+        .to(card1, { opacity: 1, visibility: 'visible', x: 0, y: 0, rotation: 0, scale: 1, duration: 1.0, ease: 'power2.out', force3D: true }, '+=0.2')
+        .to(card2, { opacity: 1, visibility: 'visible', x: 0, y: 0, rotation: 0, scale: 1, duration: 1.0, ease: 'power2.out', force3D: true }, '+=0.12')
+        .to(card3, { opacity: 1, visibility: 'visible', x: 0, y: 0, rotation: 0, scale: 1, duration: 1.0, ease: 'power2.out', force3D: true }, '+=0.12')
+        .to(status, { opacity: 1, y: 0, visibility: 'visible', duration: 0.5, ease: 'power2.out' }, '+=0.1');
 
-      // Ensure refresh after assets load
       const handleLoad = () => ScrollTrigger.refresh();
       window.addEventListener('load', handleLoad);
       const refreshTimeout = window.setTimeout(() => ScrollTrigger.refresh(), 100);
@@ -83,6 +105,9 @@ const ImageCollageSection = () => {
         window.clearTimeout(refreshTimeout);
         tl.scrollTrigger && tl.scrollTrigger.kill();
         tl.kill();
+        if (mainEl && originalSnap !== null) mainEl.style.scrollSnapType = originalSnap;
+        if (originalScrollBehavior !== null) htmlEl.style.scrollBehavior = originalScrollBehavior;
+        else htmlEl.style.removeProperty('scroll-behavior');
       };
     }, section);
 
@@ -92,7 +117,7 @@ const ImageCollageSection = () => {
   return (
     <section
       ref={sectionRef}
-      className="relative min-h-[120vh] bg-gray-50 dark:bg-gray-900 overflow-hidden"
+      className="relative min-h-[140vh] bg-gray-50 dark:bg-gray-900 overflow-hidden"
     >
       {/* Progress bar */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gray-200 dark:bg-gray-700 z-50">

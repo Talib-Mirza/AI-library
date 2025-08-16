@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import HeroSection from '../components/landing/HeroSection';
 import ImageCollageSection from '../components/landing/ImageCollageSection';
 import ConversationSection from '../components/landing/ConversationSection';
@@ -11,16 +11,15 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 gsap.registerPlugin(ScrollTrigger);
 
 const HomePage = () => {
+  const triggersRef = useRef<ScrollTrigger[]>([]);
+
   useEffect(() => {
-    // Smooth scroll behavior
-    document.documentElement.style.scrollBehavior = 'smooth';
-    
     // Note: Scroll to next section functionality temporarily removed due to TypeScript issues
 
-    // Cleanup
+    // Cleanup - only clean up this component's triggers
     return () => {
-      document.documentElement.style.scrollBehavior = 'auto';
-      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+      triggersRef.current.forEach(trigger => trigger.kill());
+      triggersRef.current = [];
     };
   }, []);
 
