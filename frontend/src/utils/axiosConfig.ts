@@ -1,7 +1,12 @@
 import axios from 'axios';
 import { getAuthToken } from './auth';
 
-const baseURL = (import.meta as any)?.env?.VITE_API_URL;
+const __rawApi = (import.meta as any)?.env?.VITE_API_URL;
+const baseURL = (__rawApi && typeof __rawApi === 'string' && __rawApi.length)
+  ? __rawApi
+  : (typeof window !== 'undefined' && window.location.origin.includes('localhost')
+      ? 'http://localhost:8000/api'
+      : '');
 
 // Create axios instance
 const api = axios.create({

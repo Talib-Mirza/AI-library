@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import api from '../utils/axiosConfig';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const RAW_BASE_URL = import.meta.env?.VITE_API_URL as string | undefined;
+const BASE_URL = (RAW_BASE_URL && RAW_BASE_URL.length)
+  ? RAW_BASE_URL.replace(/\/$/, '')
+  : (typeof window !== 'undefined' && window.location.origin.includes('localhost') ? 'http://localhost:8000/api' : '');
 
 interface User {
   id: string;
