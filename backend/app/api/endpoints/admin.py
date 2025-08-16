@@ -141,4 +141,24 @@ async def delete_user(
             raise HTTPException(status_code=404, detail="User not found")
         await session.delete(db_user)
         await session.commit()
-        return {"message": "User deleted"} 
+        return {"message": "User deleted"}
+
+@router.post("/users/{user_id}/recompute-totals")
+async def admin_recompute_totals_for_user(
+    user_id: int,
+    current_admin: User = Depends(get_current_admin_user),
+) -> Any:
+    await usage_service.recompute_totals_for_user(user_id)
+    async with async_session_factory() as session:
+        db_user = await session.get(User, user_id)
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return await _enrich_user(db_user)
+
+
+@router.post("/users/recompute-totals-all")
+async def admin_recompute_totals_for_all(
+    current_admin: User = Depends(get_current_admin_user),
+) -> Any:
+    count = await usage_service.recompute_totals_for_all_users()
+    return {"updated_users": count} 

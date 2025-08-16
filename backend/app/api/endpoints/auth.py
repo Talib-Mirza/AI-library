@@ -437,23 +437,20 @@ async def increment_tts_minutes(
     request: dict,
     current_user: User = Depends(get_current_user)
 ) -> Any:
-    """Increment user's total and monthly TTS minutes by the given amount."""
+    """Increment user's TTS minutes consistently (updates monthly and total once)."""
     minutes = int(request.get("minutes", 0))
     if minutes <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Minutes must be greater than 0"
         )
-    
-    user_service = UserService()
-    await user_service.increment_tts_minutes(current_user.id, minutes)
 
-    # Also increment monthly period usage to keep limits accurate
+    # Single source of truth: increment via UsageService (updates monthly + total)
     try:
         from app.services.usage_service import usage_service
         await usage_service.increment(current_user.id, 'tts_minutes', minutes)
     except Exception:
-        # best-effort; do not fail if monthly usage store not available
+        # best-effort; do not fail if usage store not available
         pass
 
     return {"message": f"TTS minutes incremented by {minutes}"}

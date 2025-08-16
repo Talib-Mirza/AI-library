@@ -209,4 +209,55 @@ class UsageService:
             },
         }
 
+    async def recompute_totals_for_user(self, user_id: int) -> None:
+        """
+        Recompute aggregate user totals from the historical monthly usage table.
+        Useful to correct any drift caused by legacy double-increments.
+        """
+        from sqlalchemy import text
+        async with async_session_factory() as session:
+            # Sum across all periods for lifetime totals
+            res = await session.execute(
+                text(
+                    """
+                    SELECT COALESCE(SUM(tts_minutes_used), 0),
+                           COALESCE(SUM(ai_queries_used), 0),
+                           COALESCE(SUM(book_uploads_used), 0)
+                    FROM user_usage_periods
+                    WHERE user_id = :uid
+                    """
+                ),
+                {"uid": user_id},
+            )
+            row = res.first()
+            total_tts, total_ai, total_uploads = (row[0] or 0, row[1] or 0, row[2] or 0)
+            await session.execute(
+                text(
+                    """
+                    UPDATE users
+                    SET total_tts_minutes = :tts,
+                        total_ai_queries = :ai,
+                        total_files_uploaded = :uploads
+                    WHERE id = :uid
+                    """
+                ),
+                {"tts": int(total_tts), "ai": int(total_ai), "uploads": int(total_uploads), "uid": user_id},
+            )
+            await session.commit()
+
+    async def recompute_totals_for_all_users(self) -> int:
+        """
+        Recompute totals for all users. Returns number of users updated.
+        """
+        from sqlalchemy import text
+        async with async_session_factory() as session:
+            ids_res = await session.execute(text("SELECT id FROM users"))
+            user_ids = [r[0] for r in ids_res.fetchall()]
+        for uid in user_ids:
+            try:
+                await self.recompute_totals_for_user(uid)
+            except Exception as e:
+                print(f"[UsageService] recompute_totals_for_user failed for {uid}: {e}")
+        return len(user_ids)
+
 usage_service = UsageService() 

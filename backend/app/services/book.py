@@ -84,13 +84,6 @@ class BookService:
         await session.commit()
         await session.refresh(book)
         
-        # Increment user's total_files_uploaded
-        from app.models.user import User
-        user = await session.get(User, user_id)
-        if user:
-            user.total_files_uploaded = (user.total_files_uploaded or 0) + 1
-            await session.commit()
-        
         # Now save file using book_id for directory structure
         file_path = await self.file_manager.save_uploaded_file(
             user_id=user_id,

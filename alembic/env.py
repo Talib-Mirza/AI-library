@@ -59,16 +59,18 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+
 def do_run_migrations(connection):
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
-		compare_server_default=True,
+        compare_server_default=True,
     )
 
     with context.begin_transaction():
         context.run_migrations()
+
 
 async def run_async_migrations():
     """Run migrations in 'online' mode.
@@ -77,22 +79,22 @@ async def run_async_migrations():
     and associate a connection with the context.
 
     """
-	# Determine if SSL is required (for remote DBs like Railway)
-	url = make_url(config.get_main_option("sqlalchemy.url"))
-	host = (url.host or "").lower()
-	require_ssl = host not in ("localhost", "127.0.0.1") and not host.endswith(".local") and not host.endswith(".internal")
-	ssl_ctx = None
-	if require_ssl:
-		ssl_ctx = ssl.create_default_context()
-		if not settings.DB_SSL_VERIFY:
-			ssl_ctx.check_hostname = False
-			ssl_ctx.verify_mode = ssl.CERT_NONE
+    # Determine if SSL is required (for remote DBs like Railway)
+    url = make_url(config.get_main_option("sqlalchemy.url"))
+    host = (url.host or "").lower()
+    require_ssl = host not in ("localhost", "127.0.0.1") and not host.endswith(".local") and not host.endswith(".internal")
+    ssl_ctx = None
+    if require_ssl:
+        ssl_ctx = ssl.create_default_context()
+        if not settings.DB_SSL_VERIFY:
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
 
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=None,
-		connect_args={"ssl": ssl_ctx if ssl_ctx else None} if require_ssl else {},
+        connect_args={"ssl": ssl_ctx if ssl_ctx else None} if require_ssl else {},
     )
 
     async with connectable.connect() as connection:
@@ -100,9 +102,11 @@ async def run_async_migrations():
 
     await connectable.dispose()
 
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     asyncio.run(run_async_migrations())
+
 
 if context.is_offline_mode():
     run_migrations_offline()
