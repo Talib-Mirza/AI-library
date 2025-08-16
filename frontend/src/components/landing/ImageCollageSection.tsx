@@ -69,20 +69,23 @@ const ImageCollageSection = () => {
       opacity: 0
     });
     
-    gsap.set(progressBar, { scaleX: 0 });
+    gsap.set(progressBar, { scaleX: 0, transformOrigin: 'left center' });
 
-    // Create the main timeline with better timing - unpin earlier
+    // Create the main timeline; use dynamic end and allow refresh on resizes/content loads
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: section,
         start: "top top",
-        end: "+=200%", // Reduced further to unpin earlier and prevent shift
+        // Dynamic end to ensure enough scroll room but avoid excessive pinning
+        end: () => "+=" + Math.round(window.innerHeight * 1.5),
         pin: true,
-        scrub: 0.5, // Faster scrub for smoother transitions
+        pinSpacing: true,
+        scrub: 0.5,
         anticipatePin: 1,
+        invalidateOnRefresh: true,
         onUpdate: (self) => {
           gsap.set(progressBar, { scaleX: self.progress });
-        }
+        },
       }
     });
 
@@ -148,7 +151,7 @@ const ImageCollageSection = () => {
       ease: "power2.out"
     }, "+=0.2")
     
-    // Phase 5: Status indicator appears (85% - 100%) - removed the shift animation
+    // Phase 5: Status indicator appears (85% - 100%)
     .to(status, {
       opacity: 1,
       y: 0,
@@ -157,9 +160,20 @@ const ImageCollageSection = () => {
       ease: "power2.out"
     }, "+=0.1");
 
-    // Cleanup function
+    // Refresh after images load/layout settles to prevent stuck pin positions
+    const handleLoad = () => {
+      ScrollTrigger.refresh();
+    };
+    window.addEventListener('load', handleLoad);
+    // Also schedule a micro refresh after mount
+    const refreshTimeout = window.setTimeout(() => ScrollTrigger.refresh(), 100);
+
+    // Cleanup function: kill only this timeline and its trigger
     return () => {
-      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+      window.removeEventListener('load', handleLoad);
+      window.clearTimeout(refreshTimeout);
+      tl.scrollTrigger && tl.scrollTrigger.kill();
+      tl.kill();
     };
   }, []);
 
