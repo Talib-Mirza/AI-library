@@ -22,6 +22,10 @@ export class SimpleAudioPlayer {
   private events: AudioPlayerEvents = {};
   private readonly DEBUG = import.meta.env?.MODE === 'development';
   
+  // Playback state guards to avoid noisy errors on teardown/startup
+  private hasStartedPlayback: boolean = false;
+  private suppressErrors: boolean = false;
+  
   /**
    * Load and play audio blob
    */
@@ -34,6 +38,10 @@ export class SimpleAudioPlayer {
       if (!audioBlob || audioBlob.size === 0) {
         throw new Error('Invalid or empty audio blob');
       }
+      
+      // Reset guards for a fresh playback
+      this.suppressErrors = false;
+      this.hasStartedPlayback = false;
       
       // Clean up previous audio with proper timing
       if (this.DEBUG) console.debug(`🧹 AudioPlayer: cleanup previous audio`);
@@ -131,6 +139,8 @@ export class SimpleAudioPlayer {
       while (playbackAttempts < maxAttempts) {
         try {
           await this.audio.play();
+          // Mark playback as started to allow real error reporting
+          this.hasStartedPlayback = true;
           break; // Success
         } catch (playError) {
           playbackAttempts++;
@@ -174,6 +184,8 @@ export class SimpleAudioPlayer {
     if (this.audio && this.audio.paused) {
       try {
         await this.audio.play();
+        // Playback is active again
+        this.hasStartedPlayback = true;
         this.startProgressTracking();
         if (this.DEBUG) console.debug(`▶️ AudioPlayer: Resumed`);
       } catch (error) {
@@ -189,10 +201,15 @@ export class SimpleAudioPlayer {
   stop(): void {
     if (this.DEBUG) console.debug(`⏹️ AudioPlayer: Stopping`);
     
+    // Suppress error events that may fire due to teardown
+    this.suppressErrors = true;
+    this.hasStartedPlayback = false;
+    
     this.stopProgressTracking();
     
     if (this.audio) {
       this.audio.pause();
+      // Reset src to release the resource, may trigger an error event we suppress
       this.audio.src = '';
       this.audio = null;
     }
@@ -259,6 +276,11 @@ export class SimpleAudioPlayer {
     });
     
     this.audio.addEventListener('error', (e) => {
+      // Ignore benign errors when we're tearing down or before playback has started
+      if (this.suppressErrors || !this.hasStartedPlayback) {
+        if (this.DEBUG) console.debug('ℹ️ AudioPlayer: Suppressed audio error event', e);
+        return;
+      }
       console.error('❌ AudioPlayer: Audio error:', e);
       this.cleanup();
       this.events.onError?.(new Error('Audio playback error'));
