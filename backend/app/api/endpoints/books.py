@@ -3,7 +3,7 @@ from typing import Any, List, Dict
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from app.auth.dependencies import get_current_user, require_within_upload_quota
 from app.core.config import settings
@@ -28,6 +28,7 @@ from app.schemas.book import (
 from app.schemas.common import PaginatedResponse, PaginationParams, SuccessResponse
 from app.services.book import BookService
 from app.services.usage_service import usage_service
+from app.services.file_manager import FileManager
 
 router = APIRouter()
 
@@ -364,6 +365,19 @@ async def get_book_content(
         # Get file path
         file_path = book.file_path
         
+        # If using R2, file_path holds the object key. Redirect to presigned URL.
+        if settings.STORAGE_BACKEND.lower() == "r2":
+            fm = FileManager()
+            try:
+                url = fm.s3.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": fm.bucket, "Key": file_path},
+                    ExpiresIn=settings.R2_PRESIGN_TTL_SECONDS,
+                )
+                return RedirectResponse(url, status_code=302)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to generate download URL: {e}")
+        
         # Check if file exists
         if not os.path.exists(file_path):
             raise HTTPException(
@@ -456,6 +470,18 @@ async def get_book_pdf(
         
         # Get file path
         file_path = book.file_path
+        
+        if settings.STORAGE_BACKEND.lower() == "r2":
+            fm = FileManager()
+            try:
+                url = fm.s3.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": fm.bucket, "Key": file_path},
+                    ExpiresIn=settings.R2_PRESIGN_TTL_SECONDS,
+                )
+                return RedirectResponse(url, status_code=302)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to generate PDF URL: {e}")
         
         # Check if file exists
         if not os.path.exists(file_path):

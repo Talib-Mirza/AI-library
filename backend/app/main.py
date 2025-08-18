@@ -128,11 +128,12 @@ async def startup_event():
 
 
 uploads_path = settings.UPLOAD_DIR
-if not os.path.isabs(uploads_path):
-    backend_dir = os.path.dirname(os.path.dirname(__file__))
-    uploads_path = os.path.join(backend_dir, uploads_path)
-os.makedirs(uploads_path, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
+if settings.STORAGE_BACKEND.lower() != "r2":
+    if not os.path.isabs(uploads_path):
+        backend_dir = os.path.dirname(os.path.dirname(__file__))
+        uploads_path = os.path.join(backend_dir, uploads_path)
+    os.makedirs(uploads_path, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
 
 
 @app.get("/")

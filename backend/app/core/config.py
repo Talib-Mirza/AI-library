@@ -101,6 +101,16 @@ class Settings(BaseSettings):
     # Other Services
     SENTRY_DSN: Optional[str] = None
     
+    # Storage Backend
+    STORAGE_BACKEND: str = "local"  # "local" or "r2"
+    R2_ACCOUNT_ID: Optional[str] = None
+    R2_BUCKET: Optional[str] = None
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    # For R2, endpoint is usually https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+    R2_ENDPOINT: Optional[str] = None
+    R2_PRESIGN_TTL_SECONDS: int = 3600
+    
     # File Upload Settings
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB

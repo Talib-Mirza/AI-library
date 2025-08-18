@@ -99,14 +99,14 @@ class BookService:
         cover_image_url = None
         if cover_image and cover_image_content:
             try:
-                cover_path = self.file_manager.save_cover_image(
+                cover_saved = self.file_manager.save_cover_image(
                     user_id=user_id,
                     book_id=str(book.id),
                     cover_image_content=cover_image_content,
                     filename=cover_image.filename or "cover.jpg"
                 )
                 # Generate URL for the cover image
-                cover_image_url = f"/uploads/{user_id}/{book.id}/cover{os.path.splitext(cover_path)[1]}"
+                cover_image_url = self.file_manager.get_cover_image_url(user_id, str(book.id))
                 book.cover_image_url = cover_image_url
                 print(f"Saved cover image for book {book.id}: {cover_image_url}")
             except Exception as e:
@@ -474,13 +474,24 @@ class BookService:
             # No cached content - need to process PDF
             print(f"No cached content found, processing PDF file: {book.file_path}")
             
-            # Verify file exists
-            if not book.file_path or not os.path.exists(book.file_path):
-                print(f"File not found at path: {book.file_path}")
+            # Determine source file path
+            source_path = book.file_path
+            if settings.STORAGE_BACKEND.lower() == "r2":
+                # file_path is a key; download to temp
+                fm = self.file_manager
+                try:
+                    source_path = fm.download_object_to_temp(book.file_path, suffix=".pdf")
+                except Exception as e:
+                    print(f"Failed to download from R2: {e}")
+                    raise HTTPException(status_code=500, detail="Failed to fetch file from storage")
+            
+            # Verify file exists locally now
+            if not source_path or not os.path.exists(source_path):
+                print(f"File not found at path: {source_path}")
                 raise HTTPException(status_code=404, detail="Book file not found")
             
             # Process the PDF and get structured content
-            content = self.pdf_processor.process_pdf(book.file_path)
+            content = self.pdf_processor.process_pdf(source_path)
             
             if not content or not content.get("pages"):
                 raise ValueError("Invalid PDF content structure")

@@ -27,6 +27,7 @@ from app.schemas.auth import Token, TokenPayload, UserCreate, UserResponse, Pagi
 from app.schemas.common import SuccessResponse
 from app.services.user import UserService
 from app.db.session import async_session_factory
+from app.services.file_manager import FileManager
 
 router = APIRouter()
 
@@ -349,32 +350,20 @@ async def upload_profile_image(
             detail="File size must be less than 5MB"
         )
     
-    # Create profile_img directory if it doesn't exist
-    profile_img_dir = Path("uploads") / str(current_user.id) / "profile_img"
-    profile_img_dir.mkdir(parents=True, exist_ok=True)
+    fm = FileManager()
+    content = await file.read()
+    # Use a stable key path under users/{id}/profile_img/
+    filename = file.filename or f"{uuid.uuid4()}.jpg"
+    key_or_path = fm.save_cover_image(current_user.id, "profile_img", content, filename)
+    # For profiles, get a URL (presigned when R2)
+    if settings.STORAGE_BACKEND.lower() == "r2":
+        # Try common ext match via get_cover_image_url (reuses naming convention)
+        url = fm.get_cover_image_url(current_user.id, "profile_img")
+        relative_url = url
+    else:
+        # Local path
+        relative_url = f"/uploads/{current_user.id}/profile_img/cover{Path(filename).suffix if Path(filename).suffix else '.jpg'}"
     
-    # Delete previous images in profile_img directory
-    for img_file in profile_img_dir.glob("*"):
-        img_file.unlink()
-    
-    # Generate unique filename
-    file_extension = Path(file.filename).suffix
-    filename = f"{uuid.uuid4()}{file_extension}"
-    file_path = profile_img_dir / filename
-    
-    # Save file
-    try:
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save file"
-        )
-    
-    # Update user profile with image URL (use relative URL for frontend access)
-    relative_url = f"/uploads/{current_user.id}/profile_img/{filename}"
     user_service = UserService()
     profile_update = ProfileUpdate(profile_picture_url=relative_url)
     updated_user = await user_service.update_profile(current_user.id, profile_update)
