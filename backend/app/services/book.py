@@ -3,6 +3,7 @@ import os
 from typing import List, Optional, Tuple, Any, Dict
 import shutil
 from datetime import datetime
+import traceback
 
 from fastapi import UploadFile, HTTPException
 from sqlalchemy import select, func
@@ -477,21 +478,30 @@ class BookService:
             # Determine source file path
             source_path = book.file_path
             if settings.STORAGE_BACKEND.lower() == "r2":
-                # file_path is a key; download to temp
                 fm = self.file_manager
                 try:
+                    print("[CONTENT] Downloading from R2 to temp ...")
                     source_path = fm.download_object_to_temp(book.file_path, suffix=".pdf")
+                    print(f"[CONTENT] Temp file: {source_path}")
                 except Exception as e:
-                    print(f"Failed to download from R2: {e}")
+                    print(f"[CONTENT][ERROR] Download failed: {e}")
+                    print(traceback.format_exc())
                     raise HTTPException(status_code=500, detail="Failed to fetch file from storage")
             
             # Verify file exists locally now
             if not source_path or not os.path.exists(source_path):
-                print(f"File not found at path: {source_path}")
+                print(f"[CONTENT][ERROR] File not found at path: {source_path}")
                 raise HTTPException(status_code=404, detail="Book file not found")
             
             # Process the PDF and get structured content
-            content = self.pdf_processor.process_pdf(source_path)
+            try:
+                print("[CONTENT] Processing PDF ...")
+                content = self.pdf_processor.process_pdf(source_path)
+                print("[CONTENT] PDF processed")
+            except Exception as e:
+                print(f"[CONTENT][ERROR] PDF processing failed: {e}")
+                print(traceback.format_exc())
+                raise
             
             if not content or not content.get("pages"):
                 raise ValueError("Invalid PDF content structure")
@@ -525,4 +535,5 @@ class BookService:
             
         except Exception as e:
             print(f"Error processing PDF: {str(e)}")
+            print(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}") 

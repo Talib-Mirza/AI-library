@@ -1,4 +1,5 @@
 import os
+import traceback
 from typing import Any, List, Dict
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status, Response
@@ -46,84 +47,87 @@ async def create_book(
 ) -> Any:
     """
     Create a new book by uploading a file.
-    
-    Requirements:
-    - User must be authenticated.
-    - File must be a valid PDF, EPUB, or TXT file.
-    - File size must be less than the maximum allowed size.
     """
-    # Validate file extension
-    file_ext = os.path.splitext(file.filename)[1].lower().lstrip(".")
-    
-    if file_ext not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File type not supported. Allowed types: {', '.join(settings.ALLOWED_EXTENSIONS)}",
-        )
-    
-    # Check file size
-    file_size = 0
-    content = await file.read()
-    file_size = len(content)
-    await file.seek(0)
-    
-    if file_size > settings.MAX_UPLOAD_SIZE:
-        max_mb = settings.MAX_UPLOAD_SIZE / (1024 * 1024)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Maximum size: {max_mb:.1f}MB",
-        )
-    
-    # Validate cover image if provided
-    cover_image_content = None
-    if cover_image and cover_image.filename:
-        # Check if it's a valid image file
-        image_ext = os.path.splitext(cover_image.filename)[1].lower().lstrip(".")
-        allowed_image_types = ["jpg", "jpeg", "png", "gif", "webp"]
-        
-        if image_ext not in allowed_image_types:
+    try:
+        print("[UPLOAD] Begin create_book")
+        print(f"[UPLOAD] User: {current_user.id}, STORAGE_BACKEND={settings.STORAGE_BACKEND}")
+        if settings.STORAGE_BACKEND.lower() == "r2":
+            print(
+                f"[UPLOAD] R2 cfg: bucket={settings.R2_BUCKET}, endpoint={settings.R2_ENDPOINT}, access_key_set={bool(settings.R2_ACCESS_KEY_ID)}"
+            )
+
+        # Validate file extension
+        file_ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
+        print(f"[UPLOAD] Incoming file: name={file.filename}, ext={file_ext}, content_type={file.content_type}")
+        if file_ext not in settings.ALLOWED_EXTENSIONS:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid image type. Allowed types: {', '.join(allowed_image_types)}",
+                detail=f"File type not supported. Allowed types: {', '.join(settings.ALLOWED_EXTENSIONS)}",
             )
-        
-        # Read cover image content
-        cover_image_content = await cover_image.read()
-        
-        # Check cover image size (max 5MB)
-        max_image_size = 5 * 1024 * 1024  # 5MB
-        if len(cover_image_content) > max_image_size:
+
+        # Read file content and size
+        content = await file.read()
+        file_size = len(content)
+        await file.seek(0)
+        print(f"[UPLOAD] File size bytes={file_size}")
+
+        if file_size > settings.MAX_UPLOAD_SIZE:
+            max_mb = settings.MAX_UPLOAD_SIZE / (1024 * 1024)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cover image too large. Maximum size: 5MB",
+                detail=f"File too large. Maximum size: {max_mb:.1f}MB",
             )
-    
-    # Create book
-    book_service = BookService(db)
-    book_create = BookCreate(
-        title=title,
-        author=author,
-        description=description,
-    )
-    
-    file_type = FileType(file_ext)
-    
-    book = await book_service.create_book(
-        book_in=book_create,
-        file=file,
-        file_content=content,
-        file_type=file_type,
-        file_size=file_size,
-        user_id=current_user.id,
-        cover_image=cover_image,
-        cover_image_content=cover_image_content,
-    )
-    # increment usage
-    await usage_service.increment(current_user.id, 'book_uploads', 1)
-    # Start processing the book in the background
-    await book_service.process_book_background(book.id)
-    
-    return book
+
+        # Cover validation
+        cover_image_content = None
+        if cover_image and cover_image.filename:
+            image_ext = os.path.splitext(cover_image.filename)[1].lower().lstrip(".")
+            print(f"[UPLOAD] Cover image: name={cover_image.filename}, ext={image_ext}, ct={cover_image.content_type}")
+            allowed_image_types = ["jpg", "jpeg", "png", "gif", "webp"]
+            if image_ext not in allowed_image_types:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid image type. Allowed types: {', '.join(allowed_image_types)}",
+                )
+            cover_image_content = await cover_image.read()
+            if len(cover_image_content) > 5 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cover image too large. Maximum size: 5MB",
+                )
+
+        book_service = BookService(db)
+        book_create = BookCreate(title=title, author=author, description=description)
+        file_type = FileType(file_ext)
+
+        print("[UPLOAD] Calling BookService.create_book ...")
+        book = await book_service.create_book(
+            book_in=book_create,
+            file=file,
+            file_content=content,
+            file_type=file_type,
+            file_size=file_size,
+            user_id=current_user.id,
+            cover_image=cover_image,
+            cover_image_content=cover_image_content,
+        )
+        print(f"[UPLOAD] Book created id={book.id}")
+
+        # increment usage
+        await usage_service.increment(current_user.id, 'book_uploads', 1)
+        print("[UPLOAD] Usage incremented")
+
+        # Start processing the book in the background
+        await book_service.process_book_background(book.id)
+        print("[UPLOAD] Background processing started")
+
+        return book
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[UPLOAD][ERROR] {type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"UploadError: {type(e).__name__}: {e}")
 
 
 @router.get("/", response_model=PaginatedResponse[BookResponse])
