@@ -90,12 +90,15 @@ class FileManager:
 		if self.is_r2:
 			s3 = self._ensure_s3()
 			key = f"{self._r2_key_prefix(user_id, pdf_id)}/{safe_filename}"
-			s3.put_object(
-				Bucket=self.bucket,
-				Key=key,
-				Body=file_content,
-				ContentType=file.content_type or "application/pdf",
-			)
+			try:
+				s3.put_object(
+					Bucket=self.bucket,
+					Key=key,
+					Body=file_content,
+					ContentType=file.content_type or "application/octet-stream",
+				)
+			except Exception as e:
+				raise HTTPException(status_code=500, detail=f"StorageError: failed to upload file: {e}")
 			return key
 		# local
 		pdf_dir = self.create_pdf_directory(user_id, pdf_id)
@@ -204,18 +207,20 @@ class FileManager:
 		return str(new_file_path)
 	
 	def _sanitize_filename(self, filename: str) -> str:
-		safe_chars = []
-		for char in filename:
+		base, ext = os.path.splitext(filename)
+		# Sanitize base
+		safe_chars: List[str] = []
+		for char in base:
 			if char.isalnum() or char in "._-":
 				safe_chars.append(char)
-			elif char in " ":
+			elif char == " ":
 				safe_chars.append("_")
-		safe_filename = "".join(safe_chars)
-		if safe_filename.startswith('.'):
-			safe_filename = "file" + safe_filename
-		if not safe_filename.lower().endswith('.pdf'):
-			safe_filename += '.pdf'
-		return safe_filename
+		safe_base = "".join(safe_chars) or "file"
+		# Ensure extension exists; default to .pdf for unknowns
+		ext = ext if ext else ".pdf"
+		# Normalize extension to lowercase and strip unsafe chars
+		ext = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+		return f"{safe_base}{ext}"
 	
 	def save_cover_image(self, user_id: int, book_id: str, cover_image_content: bytes, filename: str) -> str:
 		"""
@@ -231,12 +236,15 @@ class FileManager:
 		if self.is_r2:
 			s3 = self._ensure_s3()
 			key = f"{self._r2_key_prefix(user_id, book_id)}/{cover_name}"
-			s3.put_object(
-				Bucket=self.bucket,
-				Key=key,
-				Body=cover_image_content,
-				ContentType="image/jpeg",
-			)
+			try:
+				s3.put_object(
+					Bucket=self.bucket,
+					Key=key,
+					Body=cover_image_content,
+					ContentType="image/jpeg",
+				)
+			except Exception as e:
+				raise HTTPException(status_code=500, detail=f"StorageError: failed to save cover image: {e}")
 			return key
 		# local
 		book_dir = self.get_pdf_directory(user_id, book_id)
