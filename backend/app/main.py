@@ -26,19 +26,19 @@ class GoogleOAuthSecurityMiddleware(BaseHTTPMiddleware):
                 if settings.EFFECTIVE_FRONTEND_URL:
                     connect_sources.append(settings.EFFECTIVE_FRONTEND_URL)
 
-            csp_policy = [
-                "default-src 'self'",
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com/gsi/client",
-                "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
-                "frame-src 'self' https://accounts.google.com/gsi/",
+        csp_policy = [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com/gsi/client",
+            "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
+            "frame-src 'self' https://accounts.google.com/gsi/",
                 f"connect-src {' '.join(connect_sources)}",
-                "img-src 'self' data: blob:",
-                "font-src 'self' data:",
-                "media-src 'self' blob: data:",
+            "img-src 'self' data: blob:",
+            "font-src 'self' data:",
+            "media-src 'self' blob: data:",
                 "worker-src 'self' blob:",
-            ]
+        ]
             resp.headers["Content-Security-Policy"] = "; ".join(csp_policy)
-
+        
             if frontend_origin:
                 resp.headers.setdefault("Access-Control-Allow-Origin", frontend_origin)
                 resp.headers.setdefault("Vary", "Origin")
@@ -49,11 +49,11 @@ class GoogleOAuthSecurityMiddleware(BaseHTTPMiddleware):
                 )
                 resp.headers.setdefault("Access-Control-Allow-Credentials", "true")
 
-            if settings.DEBUG:
+        if settings.DEBUG:
                 resp.headers["Access-Control-Allow-Origin"] = "*"
                 resp.headers["Access-Control-Allow-Methods"] = "*"
                 resp.headers["Access-Control-Allow-Headers"] = "*"
-
+        
             return resp
 
         # Preflight

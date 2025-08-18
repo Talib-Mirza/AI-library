@@ -7,7 +7,6 @@ gsap.registerPlugin(ScrollTrigger);
 const ScrollProgressBar = () => {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const progressFillRef = useRef<HTMLDivElement>(null);
-  const triggersRef = useRef<ScrollTrigger[]>([]);
 
   useEffect(() => {
     if (!progressBarRef.current || !progressFillRef.current) return;
@@ -16,7 +15,7 @@ const ScrollProgressBar = () => {
     const progressFill = progressFillRef.current;
 
     // Create scroll progress animation
-    const progressTrigger = ScrollTrigger.create({
+    ScrollTrigger.create({
       trigger: document.body,
       start: "top top",
       end: "bottom bottom",
@@ -38,7 +37,7 @@ const ScrollProgressBar = () => {
     });
 
     // Show/hide progress bar based on scroll
-    const visibilityTrigger = ScrollTrigger.create({
+    ScrollTrigger.create({
       trigger: document.body,
       start: "top -50",
       end: "bottom bottom",
@@ -76,25 +75,23 @@ const ScrollProgressBar = () => {
       }
     });
 
-    // Store our triggers
-    triggersRef.current = [progressTrigger, visibilityTrigger];
-
     return () => {
-      // Only clean up this component's triggers
-      triggersRef.current.forEach(trigger => trigger.kill());
-      triggersRef.current = [];
+      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
     };
   }, []);
 
   return (
     <div 
       ref={progressBarRef}
-      className="fixed top-0 left-0 w-full h-1 bg-black/10 dark:bg-white/10 z-50 opacity-0 transform -translate-y-2"
+      className="fixed top-0 left-0 w-full h-1 z-50 opacity-0 transform -translate-y-2"
     >
-      <div 
-        ref={progressFillRef}
-        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 origin-left scale-x-0"
-      />
+      <div className="w-full h-full bg-white/10 backdrop-blur-sm">
+        <div 
+          ref={progressFillRef}
+          className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transform scale-x-0 shadow-lg"
+          style={{ transformOrigin: "left center" }}
+        />
+      </div>
     </div>
   );
 };

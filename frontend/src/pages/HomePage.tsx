@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import HeroSection from '../components/landing/HeroSection';
-import ImageCollageSection from '../components/landing/ImageCollageSection';
+import ImageCollage from '../components/landing/ImageCollage';
 import ConversationSection from '../components/landing/ConversationSection';
 import FeaturesSection from '../components/landing/FeaturesSection';
 import CTASection from '../components/landing/CTASection';
@@ -11,15 +11,12 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 gsap.registerPlugin(ScrollTrigger);
 
 const HomePage = () => {
-  const triggersRef = useRef<ScrollTrigger[]>([]);
-
   useEffect(() => {
     // Note: Scroll to next section functionality temporarily removed due to TypeScript issues
 
-    // Cleanup - only clean up this component's triggers
+    // Cleanup
     return () => {
-      triggersRef.current.forEach(trigger => trigger.kill());
-      triggersRef.current = [];
+      ScrollTrigger.getAll().forEach(trigger => trigger.kill());
     };
   }, []);
 
@@ -42,7 +39,7 @@ const HomePage = () => {
 
         {/* Section 2: Image Collage */}
         <div style={{ scrollSnapAlign: 'start' }}>
-          <ImageCollageSection />
+          <ImageCollage />
         </div>
 
         {/* Section 3: Conversation Feature with Scroll Snapping */}
