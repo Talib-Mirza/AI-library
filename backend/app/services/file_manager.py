@@ -30,19 +30,28 @@ class FileManager:
 		self.max_json_size = 5 * 1024 * 1024  # 5MB threshold for compression
 		self.is_r2 = settings.STORAGE_BACKEND.lower() == "r2"
 		self.bucket = settings.R2_BUCKET
+		# Lazy-init S3 client to avoid errors where not needed (e.g., listing books)
 		self.s3 = None
-		if self.is_r2:
-			if not _S3_AVAILABLE:
-				raise RuntimeError("boto3 not installed; required for R2 backend")
-			self.s3 = boto3.client(
-				"s3",
-				endpoint_url=settings.R2_ENDPOINT,
-				region_name="auto",
-				aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-				aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-				config=BotoConfig(signature_version="s3v4"),
-			)
 	
+	def _ensure_s3(self):
+		if not self.is_r2:
+			raise RuntimeError("S3 client requested but STORAGE_BACKEND is not r2")
+		if self.s3 is not None:
+			return self.s3
+		if not _S3_AVAILABLE:
+			raise RuntimeError("boto3 not installed; required for R2 backend")
+		if not settings.R2_ENDPOINT or not settings.R2_ACCESS_KEY_ID or not settings.R2_SECRET_ACCESS_KEY or not self.bucket:
+			raise RuntimeError("R2 configuration missing (endpoint, keys, or bucket)")
+		self.s3 = boto3.client(
+			"s3",
+			endpoint_url=settings.R2_ENDPOINT,
+			region_name="auto",
+			aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+			aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+			config=BotoConfig(signature_version="s3v4"),
+		)
+		return self.s3
+
 	def generate_pdf_id(self) -> str:
 		"""Generate a unique PDF ID using UUID4."""
 		return str(uuid.uuid4())
@@ -79,8 +88,9 @@ class FileManager:
 		original_name = file.filename or "document.pdf"
 		safe_filename = self._sanitize_filename(original_name)
 		if self.is_r2:
+			s3 = self._ensure_s3()
 			key = f"{self._r2_key_prefix(user_id, pdf_id)}/{safe_filename}"
-			self.s3.put_object(
+			s3.put_object(
 				Bucket=self.bucket,
 				Key=key,
 				Body=file_content,
@@ -219,8 +229,9 @@ class FileManager:
 			safe_filename = safe_filename.rsplit('.', 1)[0] + '.jpg'
 		cover_name = f"cover{os.path.splitext(safe_filename)[1]}"
 		if self.is_r2:
+			s3 = self._ensure_s3()
 			key = f"{self._r2_key_prefix(user_id, book_id)}/{cover_name}"
-			self.s3.put_object(
+			s3.put_object(
 				Bucket=self.bucket,
 				Key=key,
 				Body=cover_image_content,
@@ -241,11 +252,12 @@ class FileManager:
 		- R2: return a presigned GET URL
 		"""
 		if self.is_r2:
+			s3 = self._ensure_s3()
 			# try common extensions
 			for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
 				key = f"{self._r2_key_prefix(user_id, book_id)}/cover{ext}"
 				try:
-					url = self.s3.generate_presigned_url(
+					url = s3.generate_presigned_url(
 						"get_object",
 						Params={"Bucket": self.bucket, "Key": key},
 						ExpiresIn=settings.R2_PRESIGN_TTL_SECONDS,
@@ -266,8 +278,8 @@ class FileManager:
 		"""Generate a presigned GET URL for an R2 object key."""
 		if not self.is_r2:
 			raise RuntimeError("Presigned URL only available for R2 backend")
-			
-		return self.s3.generate_presigned_url(
+		s3 = self._ensure_s3()
+		return s3.generate_presigned_url(
 			"get_object",
 			Params={"Bucket": self.bucket, "Key": key},
 			ExpiresIn=ttl or settings.R2_PRESIGN_TTL_SECONDS,
@@ -278,7 +290,8 @@ class FileManager:
 		if not self.is_r2:
 			raise RuntimeError("Download only available for R2 backend")
 		import tempfile
-		resp = self.s3.get_object(Bucket=self.bucket, Key=key)
+		s3 = self._ensure_s3()
+		resp = s3.get_object(Bucket=self.bucket, Key=key)
 		body = resp["Body"].read()
 		tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
 		tmp.write(body)

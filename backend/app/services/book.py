@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db, async_session_factory
 from app.models.book import Book, Bookmark, Highlight, Annotation, FileType
-from app.schemas.book import BookCreate, BookUpdate, BookmarkCreate, HighlightCreate, AnnotationCreate
+from app.schemas.book import BookCreate, BookUpdate, BookmarkCreate, HighlightCreate, AnnotationCreate, BookResponse
 from app.core.config import settings
 from app.services.pdf_processor import PDFProcessor
 from app.services.file_manager import FileManager
