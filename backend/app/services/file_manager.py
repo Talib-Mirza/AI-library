@@ -88,18 +88,18 @@ class FileManager:
 		original_name = file.filename or "document.pdf"
 		safe_filename = self._sanitize_filename(original_name)
 		if self.is_r2:
-			s3 = self._ensure_s3()
-			key = f"{self._r2_key_prefix(user_id, pdf_id)}/{safe_filename}"
 			try:
+				s3 = self._ensure_s3()
+				key = f"{self._r2_key_prefix(user_id, pdf_id)}/{safe_filename}"
 				s3.put_object(
 					Bucket=self.bucket,
 					Key=key,
 					Body=file_content,
 					ContentType=file.content_type or "application/octet-stream",
 				)
+				return key
 			except Exception as e:
 				raise HTTPException(status_code=500, detail=f"StorageError: failed to upload file: {e}")
-			return key
 		# local
 		pdf_dir = self.create_pdf_directory(user_id, pdf_id)
 		file_path = pdf_dir / safe_filename
