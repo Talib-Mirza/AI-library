@@ -32,24 +32,32 @@ class FileManager:
 		self.bucket = settings.R2_BUCKET
 		# Lazy-init S3 client to avoid errors where not needed (e.g., listing books)
 		self.s3 = None
+		self._s3_validated = False
 	
 	def _ensure_s3(self):
 		if not self.is_r2:
 			raise RuntimeError("S3 client requested but STORAGE_BACKEND is not r2")
-		if self.s3 is not None:
-			return self.s3
-		if not _S3_AVAILABLE:
-			raise RuntimeError("boto3 not installed; required for R2 backend")
-		if not settings.R2_ENDPOINT or not settings.R2_ACCESS_KEY_ID or not settings.R2_SECRET_ACCESS_KEY or not self.bucket:
-			raise RuntimeError("R2 configuration missing (endpoint, keys, or bucket)")
-		self.s3 = boto3.client(
-			"s3",
-			endpoint_url=settings.R2_ENDPOINT,
-			region_name="auto",
-			aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-			aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-			config=BotoConfig(signature_version="s3v4"),
-		)
+		if self.s3 is None:
+			if not _S3_AVAILABLE:
+				raise RuntimeError("boto3 not installed; required for R2 backend")
+			if not settings.R2_ENDPOINT or not settings.R2_ACCESS_KEY_ID or not settings.R2_SECRET_ACCESS_KEY or not self.bucket:
+				raise RuntimeError("R2 configuration missing (endpoint, keys, or bucket)")
+			self.s3 = boto3.client(
+				"s3",
+				endpoint_url=settings.R2_ENDPOINT,
+				region_name="auto",
+				aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+				aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+				config=BotoConfig(signature_version="s3v4"),
+			)
+		# Validate bucket once
+		if not self._s3_validated:
+			try:
+				self.s3.head_bucket(Bucket=self.bucket)
+				self._s3_validated = True
+			except Exception as e:
+				# Surface bucket or permission issues early
+				raise RuntimeError(f"R2 bucket validation failed: {e}")
 		return self.s3
 
 	def generate_pdf_id(self) -> str:

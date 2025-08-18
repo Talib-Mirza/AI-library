@@ -122,7 +122,9 @@ async def create_book(
         print("[UPLOAD] Background processing started")
 
         return book
-    except HTTPException:
+    except HTTPException as he:
+        print(f"[UPLOAD][HTTPException] {he.detail}")
+        print(traceback.format_exc())
         raise
     except Exception as e:
         print(f"[UPLOAD][ERROR] {type(e).__name__}: {e}")

@@ -60,64 +60,74 @@ class BookService:
             Created book object
         """
         session = self.db
-        
-        # Generate unique PDF ID
-        pdf_id = self.file_manager.generate_pdf_id()
-        
-        # Save file using book_id for directory structure (will be created after book is saved)
-        # We'll move the file after the book is created and we have the book_id
-        
-        # Create book object first
-        book = Book(
-            title=book_in.title,
-            author=book_in.author,
-            description=book_in.description,
-            pdf_id=pdf_id,  # Keep pdf_id for backward compatibility but use book_id for directories
-            file_path="",  # Will be set after file is saved
-            file_type=file_type,
-            file_size=file_size,
-            is_processed=False,
-            user_id=user_id,
-        )
-        
-        # Add and commit to get the book_id
-        session.add(book)
-        await session.commit()
-        await session.refresh(book)
-        
-        # Now save file using book_id for directory structure
-        file_path = await self.file_manager.save_uploaded_file(
-            user_id=user_id,
-            pdf_id=str(book.id),  # Use book_id as directory name
-            file=file,
-            file_content=file_content
-        )
-        
-        # Update book with file path
-        book.file_path = file_path
-        
-        # Handle cover image if provided
-        cover_image_url = None
-        if cover_image and cover_image_content:
+        try:
+            print(f"[CREATE] Start create_book user_id={user_id} size={file_size}B type={file_type}")
+            # Generate unique PDF ID
+            pdf_id = self.file_manager.generate_pdf_id()
+            print(f"[CREATE] Generated pdf_id={pdf_id}")
+
+            # Create book object first
+            book = Book(
+                title=book_in.title,
+                author=book_in.author,
+                description=book_in.description,
+                pdf_id=pdf_id,
+                file_path="",
+                file_type=file_type,
+                file_size=file_size,
+                is_processed=False,
+                user_id=user_id,
+            )
+            session.add(book)
+            await session.commit()
+            await session.refresh(book)
+            print(f"[CREATE] Inserted book id={book.id}")
+
+            # Save original file
+            print(f"[CREATE] Saving original file ... STORAGE_BACKEND={settings.STORAGE_BACKEND}")
+            file_path = await self.file_manager.save_uploaded_file(
+                user_id=user_id,
+                pdf_id=str(book.id),
+                file=file,
+                file_content=file_content,
+            )
+            print(f"[CREATE] Saved file. path_or_key={file_path}")
+
+            # Update book with file path/key
+            book.file_path = file_path
+
+            # Handle cover image if provided
+            if cover_image and cover_image_content:
+                try:
+                    print("[CREATE] Saving cover image ...")
+                    _ = self.file_manager.save_cover_image(
+                        user_id=user_id,
+                        book_id=str(book.id),
+                        cover_image_content=cover_image_content,
+                        filename=cover_image.filename or "cover.jpg",
+                    )
+                    cover_image_url = self.file_manager.get_cover_image_url(user_id, str(book.id))
+                    book.cover_image_url = cover_image_url
+                    print(f"[CREATE] Cover image ready url={cover_image_url}")
+                except Exception as ce:
+                    print(f"[CREATE][WARN] Failed to save cover image: {ce}")
+                    print(traceback.format_exc())
+
+            await session.commit()
+            await session.refresh(book)
+            print(f"[CREATE] Finished create_book id={book.id}")
+            return book
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"[CREATE][ERROR] {type(e).__name__}: {e}")
+            print(traceback.format_exc())
+            # Try rollback to clean state
             try:
-                cover_saved = self.file_manager.save_cover_image(
-                    user_id=user_id,
-                    book_id=str(book.id),
-                    cover_image_content=cover_image_content,
-                    filename=cover_image.filename or "cover.jpg"
-                )
-                # Generate URL for the cover image
-                cover_image_url = self.file_manager.get_cover_image_url(user_id, str(book.id))
-                book.cover_image_url = cover_image_url
-                print(f"Saved cover image for book {book.id}: {cover_image_url}")
-            except Exception as e:
-                print(f"Warning: Could not save cover image for book {book.id}: {str(e)}")
-                # Continue without cover image
-        
-        await session.commit()
-        await session.refresh(book)
-        
-        return book
+                await session.rollback()
+            except Exception:
+                pass
+            raise
     
     async def process_book_background(self, book_id: int) -> None:
         """
