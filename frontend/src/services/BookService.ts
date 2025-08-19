@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosProgressEvent } from 'axios';
 import { getAuthToken } from '../utils/auth';
 import api from '../utils/axiosConfig';
 
@@ -222,10 +222,17 @@ class BookService {
   // Create a new book with file upload
   async createBook(formData: FormData) {
     try {
-      // Use the configured api instance which already handles auth headers
+      // Let Axios/browser set multipart boundaries; also log progress for debugging
       const response = await api.post('/books/', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
+        onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+          const total = progressEvent.total || 0;
+          const loaded = progressEvent.loaded || 0;
+          if (total > 0) {
+            const percent = Math.round((loaded * 100) / total);
+            console.log(`[BookService] Upload progress: ${percent}% (${loaded}/${total})`);
+          } else {
+            console.log(`[BookService] Upload progress: ${loaded} bytes`);
+          }
         },
       });
       

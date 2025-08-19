@@ -5,6 +5,7 @@ from typing import Any, List, Dict
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi import Request
 
 from app.auth.dependencies import get_current_user, require_within_upload_quota
 from app.core.config import settings
@@ -36,6 +37,7 @@ router = APIRouter()
 
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def create_book(
+    request: Request,
     title: str = Form(...),
     author: str = Form(None),
     description: str = Form(None),
@@ -51,6 +53,16 @@ async def create_book(
     try:
         print("[UPLOAD] Begin create_book")
         print(f"[UPLOAD] User: {current_user.id}, STORAGE_BACKEND={settings.STORAGE_BACKEND}")
+        # Log request headers to diagnose transport/content-type issues
+        try:
+            cl = request.headers.get('content-length')
+            ct = request.headers.get('content-type')
+            ua = request.headers.get('user-agent')
+            orh = request.headers.get('origin')
+            enc = request.headers.get('content-encoding')
+            print(f"[UPLOAD] Headers: content-type={ct}, content-length={cl}, content-encoding={enc}, origin={orh}, user-agent={ua}")
+        except Exception as hdr_e:
+            print(f"[UPLOAD][WARN] Failed to log headers: {hdr_e}")
         if settings.STORAGE_BACKEND.lower() == "r2":
             print(
                 f"[UPLOAD] R2 cfg: bucket={settings.R2_BUCKET}, endpoint={settings.R2_ENDPOINT}, access_key_set={bool(settings.R2_ACCESS_KEY_ID)}"

@@ -12,15 +12,14 @@ const baseURL = (__rawApi && typeof __rawApi === 'string' && __rawApi.length)
 const api = axios.create({
   baseURL,
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 const DEBUG = import.meta.env?.MODE === 'development' || process.env.NODE_ENV === 'development';
 
 // Optional concise dev-only request log
 if (DEBUG) {
+  // Verify baseURL at init in dev
+  // console.debug(`[API] baseURL: ${baseURL}`);
   api.interceptors.request.use(
     (config) => {
       // minimal: METHOD path
@@ -36,7 +35,8 @@ api.interceptors.request.use(
   (config) => {
     const token = getAuthToken();
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers = config.headers || {};
+      (config.headers as any).Authorization = `Bearer ${token}`;
     }
     return config;
   },
