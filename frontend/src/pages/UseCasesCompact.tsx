@@ -53,7 +53,7 @@ const useCases = [
     description: 'Use your book collection to prepare for exams with AI-assisted learning techniques.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-        <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
+        <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01-.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
       </svg>
     ),
     features: [
@@ -96,63 +96,85 @@ const useCases = [
   }
 ];
 
+const fadeUp = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 }
+};
+
 const UseCasesCompact: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900">
-      {/* Top bar */}
-      <div className="container mx-auto px-6 pt-24 pb-6 flex items-center justify-between">
-        <Link to="/" className="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600">← Home</Link>
-        <Link to="/register" className="px-4 py-2 text-sm rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white">Get Started</Link>
+    <div className="relative min-h-screen w-screen overflow-x-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-[#0b1020]">
+      {/* Background beams */}
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <div className="absolute inset-0 opacity-[0.07] bg-[radial-gradient(900px_600px_at_10%_-10%,rgba(99,102,241,0.35),transparent),radial-gradient(800px_500px_at_90%_0%,rgba(168,85,247,0.25),transparent),radial-gradient(1000px_600px_at_50%_120%,rgba(16,185,129,0.15),transparent)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,transparent_0.5px,transparent_1.5px),linear-gradient(to_bottom,transparent_0.5px,transparent_1.5px)] bg-[length:24px_24px] opacity-[0.06]" />
       </div>
 
-      {/* Hero */}
-      <div className="text-center max-w-3xl mx-auto px-6">
-        <motion.h1 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="text-3xl md:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-          Unlock the Power of Your eLibrary
-        </motion.h1>
-        <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05, duration: 0.4 }} className="mt-3 text-gray-600 dark:text-gray-300">
-          Discover how our AI-powered eLibrary transforms the way you read, research, and learn.
-        </motion.p>
-      </div>
+      {/* Content */}
+      <div className="relative z-10 w-full flex flex-col items-center">
+        {/* Top bar */}
+        <div className="w-full px-6 pt-24 pb-6 flex items-center justify-between">
+          <Link to="/" className="text-sm text-gray-300 hover:text-white/90">← Home</Link>
+          <Link to="/register" className="px-4 py-2 text-sm rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-600/20">Get Started</Link>
+        </div>
 
-      {/* Compact cards */}
-      <div className="max-w-6xl mx-auto px-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-10 mb-20">
-        {useCases.map((uc, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.3, delay: i * 0.03 }}
-            whileHover={{ y: -4, scale: 1.01 }}
-            className="relative rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/60 backdrop-blur-sm p-5 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 text-blue-700 dark:text-blue-300 flex items-center justify-center">
-                {uc.icon}
-              </div>
-              <h3 className="font-semibold text-gray-900 dark:text-white">{uc.title}</h3>
-            </div>
-            <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">{uc.description}</p>
-            <ul className="mt-4 space-y-1.5">
-              {uc.features.map((f, idx) => (
-                <li key={idx} className="flex items-start text-sm text-gray-700 dark:text-gray-300">
-                  <svg className="h-4 w-4 text-emerald-500 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-        ))}
-      </div>
+        {/* Hero */}
+        <div className="w-full px-6 text-center">
+          <motion.h1 {...fadeUp} transition={{ duration: 0.5 }} className="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-300 to-emerald-300">
+            Unlock the Power of Your eLibrary
+          </motion.h1>
+          <motion.p {...fadeUp} transition={{ duration: 0.5, delay: 0.05 }} className="mt-3 text-gray-300">
+            Discover how our AI-powered eLibrary transforms the way you read, research, and learn.
+          </motion.p>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3, duration: 0.6 }} className="mx-auto mt-8 h-[1px] w-32 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+        </div>
 
-      {/* Bottom CTA */}
-      <div className="text-center pb-16">
-        <Link to="/register" className="inline-flex items-center px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700">
-          Get Started
-        </Link>
+        {/* Cards Grid */}
+        <div className="w-full px-6 md:px-10 lg:px-16 py-12 md:py-16">
+          <div className="mx-auto w-full max-w-[1600px] grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+            {useCases.map((uc, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 14, scale: 0.995 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                viewport={{ once: true, margin: '-10% 0px -10% 0px' }}
+                transition={{ duration: 0.45, delay: i * 0.03 }}
+                className="group relative rounded-2xl border border-white/10 bg-white/5 dark:bg-white/[0.035] p-6 backdrop-blur-xl shadow-[0_15px_35px_rgba(0,0,0,0.25)] hover:shadow-[0_25px_55px_rgba(0,0,0,0.35)] transition-all"
+              >
+                {/* Accents */}
+                <div className="absolute -inset-px rounded-2xl bg-[linear-gradient(145deg,transparent,rgba(255,255,255,0.07),transparent)] opacity-0 group-hover:opacity-100 transition" />
+                <div className="absolute top-0 left-0 h-px w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 group-hover:opacity-100 transition" />
+
+                <div className="relative">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 text-blue-200 flex items-center justify-center">
+                      {uc.icon}
+                    </div>
+                    <h3 className="font-semibold text-white text-lg md:text-xl">{uc.title}</h3>
+                  </div>
+                  <p className="mt-3 text-sm text-gray-300/95">{uc.description}</p>
+                  <ul className="mt-4 space-y-2">
+                    {uc.features.map((f, idx) => (
+                      <li key={idx} className="flex items-start text-sm text-gray-200/95">
+                        <svg className="h-4 w-4 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom CTA */}
+        <div className="w-full text-center pb-16 pt-2">
+          <Link to="/register" className="inline-flex items-center px-7 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-blue-600/20">
+            Get Started
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -66,36 +66,31 @@ function App() {
                 <ErrorBoundary>
                   <Routes>
                     <Route path="/" element={<HomePage />} />
-                    <Route path="/login" element={<div className="container mx-auto px-4 pt-28 pb-8"><LoginPage /></div>} />
-                    <Route path="/register" element={<div className="container mx-auto px-4 pt-28 pb-8"><RegisterPage /></div>} />
-                    <Route path="/verify-email" element={<div className="container mx-auto px-4 pt-28 pb-8"><VerifyEmailPage /></div>} />
-                    <Route path="/forgot-password" element={<div className="container mx-auto px-4 pt-28 pb-8"><ForgotPasswordPage /></div>} />
-                    <Route path="/reset-password" element={<div className="container mx-auto px-4 pt-28 pb-8"><ResetPasswordPage /></div>} />
-                    <Route path="/oauth-debug" element={<div className="container mx-auto px-4 pt-28 pb-8"><GoogleOAuthDebug /></div>} />
-                    <Route path="/use-cases" element={<div className="container mx-auto px-4 pt-28 pb-8"><UseCasesCompact /></div>} />
-                    <Route path="/pricing" element={<div className="container mx-auto px-4 pt-28 pb-8"><PricingPage /></div>} />
-                    <Route path="/privacy" element={<div className="container mx-auto px-4 pt-28 pb-8"><PrivacyPolicyPage /></div>} />
-                    <Route path="/terms" element={<div className="container mx-auto px-4 pt-28 pb-8"><TermsOfServicePage /></div>} />
-                    <Route path="/billing/success" element={<div className="container mx-auto px-4"><BillingSuccessPage /></div>} />
-                    <Route path="/billing/cancel" element={<div className="container mx-auto px-4"><BillingCancelPage /></div>} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/verify-email" element={<VerifyEmailPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/use-cases" element={<UseCasesCompact />} />
+                    <Route path="/pricing" element={<PricingPage />} />
+                    <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                    <Route path="/terms" element={<TermsOfServicePage />} />
+                    <Route path="/billing/success" element={<BillingSuccessPage />} />
+                    <Route path="/billing/cancel" element={<BillingCancelPage />} />
                     <Route 
                       path="/dashboard" 
                       element={
-                        <div className="container mx-auto px-4 pt-28 pb-8">
-                          <ProtectedRoute>
-                            <DashboardPage />
-                          </ProtectedRoute>
-                        </div>
+                        <ProtectedRoute>
+                          <DashboardPage />
+                        </ProtectedRoute>
                       } 
                     />
                     <Route 
                       path="/books/:bookId" 
                       element={
-                        <div className="container mx-auto px-4 pt-28 pb-8">
-                          <ProtectedRoute>
-                            <BookDetailsPage />
-                          </ProtectedRoute>
-                        </div>
+                        <ProtectedRoute>
+                          <BookDetailsPage />
+                        </ProtectedRoute>
                       } 
                     />
                     <Route 
@@ -109,16 +104,14 @@ function App() {
                     <Route 
                       path="/admin" 
                       element={
-                        <div className="container mx-auto px-4 pt-28 pb-8">
-                          <ProtectedRoute>
-                            <AdminRoute>
-                              <AdminPage />
-                            </AdminRoute>
-                          </ProtectedRoute>
-                        </div>
+                        <ProtectedRoute>
+                          <AdminRoute>
+                            <AdminPage />
+                          </AdminRoute>
+                        </ProtectedRoute>
                       }
                     />
-                    <Route path="*" element={<div className="container mx-auto px-4 pt-28 pb-8"><NotFoundPage /></div>} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </ErrorBoundary>
               </main>

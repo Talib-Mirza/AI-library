@@ -14,6 +14,13 @@ const ResetPasswordPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [strength, setStrength] = useState<{ score: number; label: string; color: string }>({ score: 0, label: '', color: 'bg-red-500' });
 
+  useEffect(() => {
+    if (!token) {
+      // Prevent direct access without a valid reset token
+      navigate('/forgot-password', { replace: true });
+    }
+  }, [token, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
