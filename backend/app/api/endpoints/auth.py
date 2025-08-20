@@ -481,9 +481,12 @@ async def delete_account(
                 print(f"[AUTH][DELETE_ACCOUNT][WARN] Dependent rows cleanup failed: {depe}")
                 print(traceback.format_exc())
 
-            user_service = UserService()
-            print(f"[AUTH][DELETE_ACCOUNT] Deleting user id={current_user.id}")
-            await user_service.delete_user(current_user.id)
+            print(f"[AUTH][DELETE_ACCOUNT] Deleting user id={current_user.id} in same session")
+            db_user = await session.get(User, current_user.id)
+            if not db_user:
+                raise HTTPException(status_code=404, detail="User not found")
+            await session.delete(db_user)
+            await session.commit()
             print(f"[AUTH][DELETE_ACCOUNT] Deleted user id={current_user.id}")
         except Exception as e:
             print(f"[AUTH][DELETE_ACCOUNT][ERROR] {type(e).__name__}: {e}")

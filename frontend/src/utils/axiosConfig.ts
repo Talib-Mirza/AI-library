@@ -30,9 +30,12 @@ if (DEBUG) {
   );
 }
 
-// Add a request interceptor to include auth token
+// Normalize URL joining so baseURL path (e.g. /api) is preserved
 api.interceptors.request.use(
   (config) => {
+    if (config.url && config.url.startsWith('/')) {
+      config.url = config.url.replace(/^\/+/, '');
+    }
     const token = getAuthToken();
     if (token) {
       config.headers = config.headers || {};
