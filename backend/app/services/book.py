@@ -328,6 +328,7 @@ class BookService:
                     success = self.file_manager.delete_book_folder(user_id, str(book_id))
                 else:
                     success = self.file_manager.delete_pdf_directory(user_id, str(book_id))
+                print(f"[DELETE] Storage cleanup result for book {book_id}: {success}")
                 if not success:
                     print(f"Warning: Could not delete book directory for book {book_id}")
             except Exception as e:

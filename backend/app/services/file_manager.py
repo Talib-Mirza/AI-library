@@ -345,6 +345,7 @@ class FileManager:
 				dir_path = base / prefix
 				if dir_path.exists():
 					shutil.rmtree(dir_path)
+					print(f"[R2][DELETE][LOCAL] Removed local folder for prefix '{prefix}'")
 				return True
 			except Exception as e:
 				print(f"[R2][DELETE][LOCAL] Failed to delete prefix {prefix}: {e}")
@@ -353,6 +354,7 @@ class FileManager:
 			s3 = self._ensure_s3()
 			continuation_token = None
 			to_delete: List[Dict[str, str]] = []
+			listed = 0
 			while True:
 				kwargs: Dict[str, Any] = {"Bucket": self.bucket, "Prefix": prefix}
 				if continuation_token:
@@ -361,16 +363,23 @@ class FileManager:
 				contents = resp.get("Contents", [])
 				for obj in contents:
 					to_delete.append({"Key": obj["Key"]})
+				listed += len(contents)
 				if resp.get("IsTruncated") and resp.get("NextContinuationToken"):
 					continuation_token = resp.get("NextContinuationToken")
 				else:
 					break
-				# Batch delete in chunks of 1000
-				if to_delete:
-					for i in range(0, len(to_delete), 1000):
-						batch = to_delete[i:i+1000]
-						if batch:
-							s3.delete_objects(Bucket=self.bucket, Delete={"Objects": batch, "Quiet": True})
+				
+			if not to_delete:
+				print(f"[R2][DELETE] No objects found under prefix '{prefix}' (listed={listed})")
+				return True
+			
+			print(f"[R2][DELETE] Deleting {len(to_delete)} objects under prefix '{prefix}' in bucket '{self.bucket}'")
+			for i in range(0, len(to_delete), 1000):
+				batch = to_delete[i:i+1000]
+				if batch:
+					s3.delete_objects(Bucket=self.bucket, Delete={"Objects": batch, "Quiet": True})
+					print(f"[R2][DELETE] Deleted batch {i//1000 + 1} size={len(batch)}")
+			print(f"[R2][DELETE] Completed deletion for prefix '{prefix}'")
 			return True
 		except Exception as e:
 			print(f"[R2][DELETE] Failed to delete prefix {prefix}: {e}")
