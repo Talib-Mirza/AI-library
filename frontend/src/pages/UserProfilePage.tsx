@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import axios from '../utils/axiosConfig';
 import api from '../utils/axiosConfig';
 import BillingService from '../services/BillingService';
+import { calculatePasswordStrength } from '../utils/passwordStrength';
 
 // Remove total_books from UserStats
 type UserStats = {
@@ -62,7 +63,7 @@ const UserProfilePage: React.FC = () => {
         // Load plan (also ensures renewal is populated server-side for existing pro users)
         try {
           const planRes = await api.get('/billing/plan');
-          setPlan({ tier: planRes.data?.tier, status: planRes.data?.status, renewal_at: planRes.data?.renewal_at });
+          setPlan({ tier: planRes.data?.tier, status: planRes.data?.status });
         } catch {}
         if (user) {
           setFormData({
@@ -91,21 +92,8 @@ const UserProfilePage: React.FC = () => {
     const { name, value } = e.target;
     setPasswordData(prev => ({ ...prev, [name]: value }));
     if (name === 'new_password') {
-      let score = 0;
-      if (value.length >= 8) score++;
-      if (/[A-Z]/.test(value)) score++;
-      if (/[a-z]/.test(value)) score++;
-      if (/\d/.test(value)) score++;
-      if (/[^A-Za-z0-9]/.test(value)) score++;
-      const levels = [
-        {label:'Very Weak', color:'bg-red-500'},
-        {label:'Weak', color:'bg-orange-500'},
-        {label:'Fair', color:'bg-yellow-500'},
-        {label:'Good', color:'bg-green-500'},
-        {label:'Strong', color:'bg-emerald-500'}
-      ];
-      const idx = Math.max(0, Math.min(score-1, levels.length-1));
-      setPasswordStrength({score, label: levels[idx].label, color: levels[idx].color});
+      const s = calculatePasswordStrength(value);
+      setPasswordStrength({score: s.score, label: s.label, color: s.color});
     }
   };
 
@@ -117,7 +105,11 @@ const UserProfilePage: React.FC = () => {
       if (formData.bio !== user?.bio) changedFields.bio = formData.bio;
       if (formData.location !== user?.location) changedFields.location = formData.location;
       if (formData.website !== user?.website) changedFields.website = formData.website;
-      if (Object.keys(changedFields).length > 0) await updateProfile(changedFields);
+      if (Object.keys(changedFields).length === 0) {
+        toast('No changes made');
+        return;
+      }
+      await updateProfile(changedFields);
       toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Save error:', error);
@@ -143,15 +135,7 @@ const UserProfilePage: React.FC = () => {
     if (!dateString) return 'Never';
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
-  const formatRenewal = () => {
-    const effTier = (plan?.tier || user?.subscription_tier || '').toLowerCase();
-    const effStatus = (plan?.status || user?.subscription_status || '').toLowerCase();
-    const active = ['active','trialing'].includes(effStatus);
-    if (!effTier || effTier !== 'pro' || !active) return 'Not pro user';
-    const renewal = plan?.renewal_at || user?.subscription_renewal_at || '';
-    if (!renewal) return 'Pending';
-    return formatDate(renewal);
-  };
+  // Renewal date display removed; direct users to the Billing page.
 
   // Adjust helpers
   const adjustTotal = async (feature: 'tts_minutes'|'ai_queries'|'book_uploads', delta: number) => {
@@ -384,7 +368,7 @@ const UserProfilePage: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Plan renewal date</p>
                     <p className="text-gray-900 dark:text-white font-medium">
-                      {formatRenewal()}
+                      See Billing page
                     </p>
                   </div>
                 </div>

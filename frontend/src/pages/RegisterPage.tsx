@@ -5,54 +5,55 @@ import { toast } from 'react-hot-toast';
 import gsap from 'gsap';
 import { motion } from 'framer-motion';
 import GoogleOAuthButton from '../components/auth/GoogleOAuthButton';
+import { calculatePasswordStrength } from '../utils/passwordStrength';
 
 // Password strength checker function
-const calculatePasswordStrength = (password: string): { score: number; feedback: string } => {
-  if (!password) return { score: 0, feedback: '' };
-  
-  let score = 0;
-  const feedback = [];
-  
-  // Check length
-  if (password.length >= 8) {
-    score += 1;
-  } else {
-    feedback.push('Use at least 8 characters');
-  }
-  
-  // Check for numbers
-  if (/\d/.test(password)) {
-    score += 1;
-  } else {
-    feedback.push('Include at least one number');
-  }
-  
-  // Check for lowercase letters
-  if (/[a-z]/.test(password)) {
-    score += 1;
-  } else {
-    feedback.push('Include at least one lowercase letter');
-  }
-  
-  // Check for uppercase letters
-  if (/[A-Z]/.test(password)) {
-    score += 1;
-  } else {
-    feedback.push('Include at least one uppercase letter');
-  }
-  
-  // Check for special characters
-  if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    score += 1;
-  } else {
-    feedback.push('Include at least one special character');
-  }
-  
-  return { 
-    score, 
-    feedback: feedback.length > 0 ? feedback.join(', ') : 'Strong password!'
-  };
-};
+// const calculatePasswordStrength = (password: string): { score: number; feedback: string } => {
+//   if (!password) return { score: 0, feedback: '' };
+//   
+//   let score = 0;
+//   const feedback = [];
+//   
+//   // Check length
+//   if (password.length >= 8) {
+//     score += 1;
+//   } else {
+//     feedback.push('Use at least 8 characters');
+//   }
+//   
+//   // Check for numbers
+//   if (/\d/.test(password)) {
+//     score += 1;
+//   } else {
+//     feedback.push('Include at least one number');
+//   }
+//   
+//   // Check for lowercase letters
+//   if (/[a-z]/.test(password)) {
+//     score += 1;
+//   } else {
+//     feedback.push('Include at least one lowercase letter');
+//   }
+//   
+//   // Check for uppercase letters
+//   if (/[A-Z]/.test(password)) {
+//     score += 1;
+//   } else {
+//     feedback.push('Include at least one uppercase letter');
+//   }
+//   
+//   // Check for special characters
+//   if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+//     score += 1;
+//   } else {
+//     feedback.push('Include at least one special character');
+//   }
+//   
+//   return { 
+//     score, 
+//     feedback: feedback.length > 0 ? feedback.join(', ') : 'Strong password!'
+//   };
+// };
 
 const RegisterPage = () => {
   const [fullName, setFullName] = useState('');
@@ -73,7 +74,8 @@ const RegisterPage = () => {
   
   // Update password strength whenever password changes
   useEffect(() => {
-    setPasswordStrength(calculatePasswordStrength(password));
+    const s = calculatePasswordStrength(password);
+    setPasswordStrength({ score: s.score, feedback: s.feedback });
   }, [password]);
   
   // GSAP animations on mount
