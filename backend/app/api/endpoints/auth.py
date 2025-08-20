@@ -463,6 +463,24 @@ async def delete_account(
             except Exception as se:
                 print(f"[AUTH][DELETE_ACCOUNT][WARN] Stripe subscription cancel failed: {se}")
                 print(traceback.format_exc())
+
+            # Best-effort: explicitly delete dependent rows to avoid FK issues
+            try:
+                from sqlalchemy import text as _text
+                uid = current_user.id
+                print(f"[AUTH][DELETE_ACCOUNT] Deleting dependent rows for user {uid}")
+                # Delete child rows referencing books owned by user
+                await session.execute(_text("DELETE FROM annotations WHERE book_id IN (SELECT id FROM books WHERE user_id = :uid)"), {"uid": uid})
+                await session.execute(_text("DELETE FROM highlights WHERE book_id IN (SELECT id FROM books WHERE user_id = :uid)"), {"uid": uid})
+                await session.execute(_text("DELETE FROM bookmarks WHERE book_id IN (SELECT id FROM books WHERE user_id = :uid)"), {"uid": uid})
+                await session.execute(_text("DELETE FROM books WHERE user_id = :uid"), {"uid": uid})
+                # Delete monthly usage rows
+                await session.execute(_text("DELETE FROM user_usage_periods WHERE user_id = :uid"), {"uid": uid})
+                print(f"[AUTH][DELETE_ACCOUNT] Dependent rows deleted for user {uid}")
+            except Exception as depe:
+                print(f"[AUTH][DELETE_ACCOUNT][WARN] Dependent rows cleanup failed: {depe}")
+                print(traceback.format_exc())
+
             user_service = UserService()
             print(f"[AUTH][DELETE_ACCOUNT] Deleting user id={current_user.id}")
             await user_service.delete_user(current_user.id)
