@@ -128,6 +128,18 @@ class BookResponse(BaseModel):
     created_at: str
     updated_at: str
     tags: Optional[List[str]] = []
+
+    @field_validator('tags', mode='before')
+    @classmethod
+    def coerce_tags(cls, v):
+        """Accept list, CSV string, or None and normalize to a list of strings."""
+        if v is None or v == '':
+            return []
+        if isinstance(v, list):
+            return [str(t).strip() for t in v if str(t).strip()]
+        if isinstance(v, str):
+            return [t.strip() for t in v.split(',') if t.strip()]
+        return []
     
     @field_validator('created_at', 'updated_at', mode='before')
     @classmethod
