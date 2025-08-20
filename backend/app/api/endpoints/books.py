@@ -35,22 +35,22 @@ from app.services.file_manager import FileManager
 router = APIRouter()
 
 
-def _attach_cover_url_if_needed(book_obj):
-    """If running on R2 and cover_image_url stores a key, convert to presigned URL for response."""
+def _book_response_with_presigned_cover(book_obj) -> BookResponse:
+    """Build a BookResponse without mutating the ORM object. Presign cover key for R2."""
+    resp = BookResponse.model_validate(book_obj)
     try:
-        if settings.STORAGE_BACKEND.lower() == "r2" and getattr(book_obj, "cover_image_url", None):
-            val = book_obj.cover_image_url or ""
-            if not isinstance(val, str):
-                return
-            if not val.startswith("http://") and not val.startswith("https://"):
+        if settings.STORAGE_BACKEND.lower() == "r2" and resp.cover_image_url:
+            val = resp.cover_image_url
+            if isinstance(val, str) and not (val.startswith("http://") or val.startswith("https://")):
                 fm = FileManager()
                 try:
                     url = fm.generate_presigned_get_url(val)
-                    book_obj.cover_image_url = url
+                    resp.cover_image_url = url
                 except Exception as e:
                     print(f"[COVER][WARN] Failed to presign cover key '{val}': {e}")
     except Exception:
         pass
+    return resp
 
 
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
@@ -120,6 +120,7 @@ async def create_book(
                     detail=f"Invalid image type. Allowed types: {', '.join(allowed_image_types)}",
                 )
             cover_image_content = await cover_image.read()
+            print(f"[UPLOAD] Cover size bytes={len(cover_image_content)}")
             if len(cover_image_content) > 5 * 1024 * 1024:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -151,10 +152,8 @@ async def create_book(
         await book_service.process_book_background(book.id)
         print("[UPLOAD] Background processing started")
 
-        # Hydrate cover URL if needed for response
-        _attach_cover_url_if_needed(book)
-
-        return book
+        # Build response with presigned cover (does not mutate ORM)
+        return _book_response_with_presigned_cover(book)
     except HTTPException as he:
         print(f"[UPLOAD][HTTPException] {he.detail}")
         print(traceback.format_exc())
@@ -191,7 +190,7 @@ async def list_books(
         _attach_cover_url_if_needed(book)
 
     return {
-        "items": books,
+        "items": [ _book_response_with_presigned_cover(b) for b in books ],
         "total": total,
         "page": pagination.page,
         "page_size": pagination.page_size,
@@ -226,10 +225,7 @@ async def get_book(
             detail="Not enough permissions",
         )
     
-    # Hydrate cover URL if needed for response
-    _attach_cover_url_if_needed(book)
-
-    return book
+    return _book_response_with_presigned_cover(book)
 
 
 @router.put("/{book_id}", response_model=BookResponse)
