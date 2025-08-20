@@ -53,6 +53,23 @@ def _book_response_with_presigned_cover(book_obj) -> BookResponse:
     return resp
 
 
+def _book_detail_with_presigned_cover(book_obj) -> BookDetailResponse:
+    resp = BookDetailResponse.model_validate(book_obj)
+    try:
+        if settings.STORAGE_BACKEND.lower() == "r2" and resp.cover_image_url:
+            val = resp.cover_image_url
+            if isinstance(val, str) and not (val.startswith("http://") or val.startswith("https://")):
+                fm = FileManager()
+                try:
+                    url = fm.generate_presigned_get_url(val)
+                    resp.cover_image_url = url
+                except Exception as e:
+                    print(f"[COVER][WARN] Failed to presign cover key '{val}': {e}")
+    except Exception:
+        pass
+    return resp
+
+
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def create_book(
     request: Request,
@@ -175,27 +192,25 @@ async def list_books(
     
     Supports pagination.
     """
-    book_service = BookService(db)
-    books, total = await book_service.get_books_by_user(
-        user_id=current_user.id,
-        page=pagination.page,
-        page_size=pagination.page_size,
-    )
-    
-    # Calculate total pages
-    pages = (total + pagination.page_size - 1) // pagination.page_size
-    
-    # Hydrate cover URL if needed for response
-    for book in books:
-        _attach_cover_url_if_needed(book)
-
-    return {
-        "items": [ _book_response_with_presigned_cover(b) for b in books ],
-        "total": total,
-        "page": pagination.page,
-        "page_size": pagination.page_size,
-        "pages": pages,
-    }
+    try:
+        book_service = BookService(db)
+        books, total = await book_service.get_books_by_user(
+            user_id=current_user.id,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
+        pages = (total + pagination.page_size - 1) // pagination.page_size
+        return {
+            "items": [ _book_response_with_presigned_cover(b) for b in books ],
+            "total": total,
+            "page": pagination.page,
+            "page_size": pagination.page_size,
+            "pages": pages,
+        }
+    except Exception as e:
+        print(f"[LIST][ERROR] {type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to list books: {type(e).__name__}: {e}")
 
 
 @router.get("/{book_id}", response_model=BookDetailResponse)
@@ -225,7 +240,7 @@ async def get_book(
             detail="Not enough permissions",
         )
     
-    return _book_response_with_presigned_cover(book)
+    return _book_detail_with_presigned_cover(book)
 
 
 @router.put("/{book_id}", response_model=BookResponse)
