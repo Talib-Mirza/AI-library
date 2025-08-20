@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # URLs
     BACKEND_URL: str = "https://thesyx.up.railway.app"
-    FRONTEND_URL: str = "https://thesyx.vercel.app"
+    FRONTEND_URL: str = "https://thesyx.org"
     # Accept alternate env var names without validation errors
     FRONTEND_ORIGIN: Optional[str] = None
     BACKEND_ORIGIN: Optional[str] = None
