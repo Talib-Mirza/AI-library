@@ -18,6 +18,7 @@ from fastapi.responses import RedirectResponse
 from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy import delete
+import stripe
 
 from app.auth.dependencies import get_current_user, get_current_admin_user
 from app.auth.jwt import create_access_token, create_refresh_token
@@ -29,6 +30,7 @@ from app.schemas.common import SuccessResponse
 from app.services.user import UserService
 from app.db.session import async_session_factory
 from app.services.file_manager import FileManager
+from app.services.stripe_service import stripe_service
 
 router = APIRouter()
 
@@ -426,6 +428,21 @@ async def delete_account(
     async with async_session_factory() as session:
         try:
             await session.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == current_user.id))
+            # Cancel active/trialing subscription if exists
+            try:
+                if current_user.stripe_customer_id:
+                    subs = stripe.Subscription.list(customer=current_user.stripe_customer_id, status='all', limit=10)
+                    for s in subs.auto_paging_iter():
+                        st = s.get('status')
+                        sid = s.get('id')
+                        if st in ('active','trialing'):
+                            try:
+                                stripe.Subscription.cancel(sid)
+                                print(f"[AUTH][DELETE_ACCOUNT] Canceled Stripe subscription {sid} for customer {current_user.stripe_customer_id}")
+                            except Exception as ce:
+                                print(f"[AUTH][DELETE_ACCOUNT][WARN] Failed to cancel subscription {sid}: {ce}")
+            except Exception as se:
+                print(f"[AUTH][DELETE_ACCOUNT][WARN] Stripe subscription cancel failed: {se}")
             user_service = UserService()
             await user_service.delete_user(current_user.id)
         except Exception as e:
