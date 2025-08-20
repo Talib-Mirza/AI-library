@@ -10,13 +10,14 @@ import secrets
 import hashlib
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from fastapi.responses import RedirectResponse
 from jose import JWTError
 from sqlalchemy import select
+from sqlalchemy import delete
 
 from app.auth.dependencies import get_current_user, get_current_admin_user
 from app.auth.jwt import create_access_token, create_refresh_token
@@ -408,17 +409,28 @@ async def delete_account(
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """Delete user account and remove their uploads directory."""
-    # Remove uploads/{user_id}
-    user_upload_dir = Path(settings.UPLOAD_DIR) / str(current_user.id)
+    # Storage cleanup (R2 or local)
+    fm = FileManager()
     try:
-        if user_upload_dir.exists() and user_upload_dir.is_dir():
-            shutil.rmtree(user_upload_dir)
+        if fm.is_r2:
+            ok = fm.delete_user_folder(current_user.id)
+            print(f"[AUTH][DELETE_ACCOUNT] R2 delete users/{current_user.id}/ -> {ok}")
+        else:
+            user_upload_dir = Path(settings.UPLOAD_DIR) / str(current_user.id)
+            if user_upload_dir.exists() and user_upload_dir.is_dir():
+                shutil.rmtree(user_upload_dir)
     except Exception as e:
-        # Log but continue with account deletion
-        print(f"[WARN] Failed to remove uploads directory {user_upload_dir}: {e}")
+        print(f"[AUTH][DELETE_ACCOUNT][WARN] Storage cleanup failed for user {current_user.id}: {e}")
 
-    user_service = UserService()
-    await user_service.delete_user(current_user.id)
+    # Delete tokens explicitly then user
+    async with async_session_factory() as session:
+        try:
+            await session.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == current_user.id))
+            user_service = UserService()
+            await user_service.delete_user(current_user.id)
+        except Exception as e:
+            print(f"[AUTH][DELETE_ACCOUNT][ERROR] {type(e).__name__}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to delete account")
     return {"message": "Account deleted successfully"}
 
 @router.post("/increment-tts-minutes", response_model=SuccessResponse)

@@ -3,10 +3,12 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
+from sqlalchemy import delete
 
 from app.auth.dependencies import get_current_admin_user
 from app.db.session import get_db, async_session_factory
 from app.models.user import User
+from app.models.password_reset_token import PasswordResetToken
 from app.services.user import UserService
 from app.services.usage_service import usage_service
 
@@ -143,6 +145,11 @@ async def delete_user(
             db_user = await session.get(User, user_id)
             if not db_user:
                 raise HTTPException(status_code=404, detail="User not found")
+            # Explicitly delete password reset tokens to avoid NOT NULL updates
+            try:
+                await session.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user_id))
+            except Exception as de:
+                print(f"[ADMIN][DELETE_USER][WARN] Failed to delete password reset tokens for user {user_id}: {de}")
             await session.delete(db_user)
             await session.commit()
         # After DB commit, remove storage folder
