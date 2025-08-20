@@ -100,15 +100,15 @@ class BookService:
             if cover_image and cover_image_content:
                 try:
                     print("[CREATE] Saving cover image ...")
-                    _ = self.file_manager.save_cover_image(
+                    cover_key = self.file_manager.save_cover_image(
                         user_id=user_id,
                         book_id=str(book.id),
                         cover_image_content=cover_image_content,
                         filename=cover_image.filename or "cover.jpg",
                     )
-                    cover_image_url = self.file_manager.get_cover_image_url(user_id, str(book.id))
-                    book.cover_image_url = cover_image_url
-                    print(f"[CREATE] Cover image ready url={cover_image_url}")
+                    # Store the storage key in DB; URL will be generated on read
+                    book.cover_image_url = cover_key
+                    print(f"[CREATE] Cover image stored key={cover_key}")
                 except Exception as ce:
                     print(f"[CREATE][WARN] Failed to save cover image: {ce}")
                     print(traceback.format_exc())

@@ -35,6 +35,24 @@ from app.services.file_manager import FileManager
 router = APIRouter()
 
 
+def _attach_cover_url_if_needed(book_obj):
+    """If running on R2 and cover_image_url stores a key, convert to presigned URL for response."""
+    try:
+        if settings.STORAGE_BACKEND.lower() == "r2" and getattr(book_obj, "cover_image_url", None):
+            val = book_obj.cover_image_url or ""
+            if not isinstance(val, str):
+                return
+            if not val.startswith("http://") and not val.startswith("https://"):
+                fm = FileManager()
+                try:
+                    url = fm.generate_presigned_get_url(val)
+                    book_obj.cover_image_url = url
+                except Exception as e:
+                    print(f"[COVER][WARN] Failed to presign cover key '{val}': {e}")
+    except Exception:
+        pass
+
+
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def create_book(
     request: Request,
@@ -133,6 +151,9 @@ async def create_book(
         await book_service.process_book_background(book.id)
         print("[UPLOAD] Background processing started")
 
+        # Hydrate cover URL if needed for response
+        _attach_cover_url_if_needed(book)
+
         return book
     except HTTPException as he:
         print(f"[UPLOAD][HTTPException] {he.detail}")
@@ -165,6 +186,10 @@ async def list_books(
     # Calculate total pages
     pages = (total + pagination.page_size - 1) // pagination.page_size
     
+    # Hydrate cover URL if needed for response
+    for book in books:
+        _attach_cover_url_if_needed(book)
+
     return {
         "items": books,
         "total": total,
@@ -201,6 +226,9 @@ async def get_book(
             detail="Not enough permissions",
         )
     
+    # Hydrate cover URL if needed for response
+    _attach_cover_url_if_needed(book)
+
     return book
 
 
