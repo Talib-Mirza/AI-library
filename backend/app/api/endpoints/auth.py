@@ -9,6 +9,7 @@ import shutil
 import secrets
 import hashlib
 from datetime import datetime, timedelta
+import traceback
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordRequestForm
@@ -411,10 +412,16 @@ async def delete_account(
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """Delete user account and remove their uploads directory."""
+    try:
+        print(f"[AUTH][DELETE_ACCOUNT] Begin user_id={current_user.id} email={current_user.email} has_stripe={bool(current_user.stripe_customer_id)}")
+    except Exception:
+        pass
     # Storage cleanup (R2 or local)
     fm = FileManager()
     try:
         if fm.is_r2:
+            prefix = f"users/{current_user.id}/"
+            print(f"[AUTH][DELETE_ACCOUNT] R2 cleanup prefix='{prefix}'")
             ok = fm.delete_user_folder(current_user.id)
             print(f"[AUTH][DELETE_ACCOUNT] R2 delete users/{current_user.id}/ -> {ok}")
         else:
@@ -423,30 +430,46 @@ async def delete_account(
                 shutil.rmtree(user_upload_dir)
     except Exception as e:
         print(f"[AUTH][DELETE_ACCOUNT][WARN] Storage cleanup failed for user {current_user.id}: {e}")
+        print(traceback.format_exc())
 
     # Delete tokens explicitly then user
     async with async_session_factory() as session:
         try:
+            # Debug counts
+            try:
+                from sqlalchemy import func as _func
+                res = await session.execute(select(_func.count()).select_from(PasswordResetToken).where(PasswordResetToken.user_id == current_user.id))
+                cnt = res.scalar_one()
+                print(f"[AUTH][DELETE_ACCOUNT] Found {cnt} password reset tokens for user {current_user.id}")
+            except Exception:
+                pass
             await session.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == current_user.id))
             # Cancel active/trialing subscription if exists
             try:
                 if current_user.stripe_customer_id:
                     subs = stripe.Subscription.list(customer=current_user.stripe_customer_id, status='all', limit=10)
+                    statuses = []
                     for s in subs.auto_paging_iter():
                         st = s.get('status')
                         sid = s.get('id')
+                        statuses.append((sid, st))
                         if st in ('active','trialing'):
                             try:
                                 stripe.Subscription.cancel(sid)
                                 print(f"[AUTH][DELETE_ACCOUNT] Canceled Stripe subscription {sid} for customer {current_user.stripe_customer_id}")
                             except Exception as ce:
                                 print(f"[AUTH][DELETE_ACCOUNT][WARN] Failed to cancel subscription {sid}: {ce}")
+                    print(f"[AUTH][DELETE_ACCOUNT] Stripe subs statuses for customer {current_user.stripe_customer_id}: {statuses}")
             except Exception as se:
                 print(f"[AUTH][DELETE_ACCOUNT][WARN] Stripe subscription cancel failed: {se}")
+                print(traceback.format_exc())
             user_service = UserService()
+            print(f"[AUTH][DELETE_ACCOUNT] Deleting user id={current_user.id}")
             await user_service.delete_user(current_user.id)
+            print(f"[AUTH][DELETE_ACCOUNT] Deleted user id={current_user.id}")
         except Exception as e:
             print(f"[AUTH][DELETE_ACCOUNT][ERROR] {type(e).__name__}: {e}")
+            print(traceback.format_exc())
             raise HTTPException(status_code=500, detail="Failed to delete account")
     return {"message": "Account deleted successfully"}
 
