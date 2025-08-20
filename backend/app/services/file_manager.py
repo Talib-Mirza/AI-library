@@ -42,14 +42,31 @@ class FileManager:
 				raise RuntimeError("boto3 not installed; required for R2 backend")
 			if not settings.R2_ENDPOINT or not settings.R2_ACCESS_KEY_ID or not settings.R2_SECRET_ACCESS_KEY or not self.bucket:
 				raise RuntimeError("R2 configuration missing (endpoint, keys, or bucket)")
+			# Sanitize credentials and endpoint to avoid hidden newlines/quotes
+			def _clean(val: str) -> str:
+				return str(val).strip().strip('"').strip("'").replace("\r", "").replace("\n", "")
+			endpoint = _clean(settings.R2_ENDPOINT)
+			if endpoint.endswith('/'):
+				endpoint = endpoint[:-1]
+			access_key = _clean(settings.R2_ACCESS_KEY_ID)
+			secret_key = _clean(settings.R2_SECRET_ACCESS_KEY)
+			bucket = _clean(self.bucket)
+			# Minimal debug (mask keys)
+			try:
+				ak_mask = access_key[:4] + "…" + access_key[-4:] if len(access_key) >= 8 else "***"
+				print(f"[R2] Initializing client endpoint={endpoint}, bucket={bucket}, access_key={ak_mask}")
+			except Exception:
+				pass
 			self.s3 = boto3.client(
 				"s3",
-				endpoint_url=settings.R2_ENDPOINT,
+				endpoint_url=endpoint,
 				region_name="auto",
-				aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-				aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-				config=BotoConfig(signature_version="s3v4"),
+				aws_access_key_id=access_key,
+				aws_secret_access_key=secret_key,
+				config=BotoConfig(signature_version="s3v4", s3={"addressing_style": "path"}),
 			)
+			# Override bucket with sanitized one
+			self.bucket = bucket
 		# Validate bucket once
 		if not self._s3_validated:
 			try:
