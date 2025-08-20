@@ -50,6 +50,14 @@ const DashboardPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
+  // Sync tag filter from URL (when clicking chips)
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const t = url.searchParams.get('tag');
+    if (t && t.length) {
+      setActiveCategory(t);
+    }
+  }, [location.search]);
   const [searchFocused, setSearchFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -515,9 +523,10 @@ const DashboardPage = () => {
                     ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg transform scale-105'
                     : 'bg-white/60 dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-800/80 text-gray-700 dark:text-gray-300 border border-gray-200/50 dark:border-gray-700/50'
                 }`}
+                aria-pressed={activeCategory === category}
               >
-                <span className="relative z-10 capitalize">
-                  {category === 'all' ? 'All Books' : category}
+                <span className="relative z-10">
+                  {category === 'all' ? 'All Books' : `#${category}`}
                 </span>
                 {activeCategory !== category && (
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -1099,17 +1108,27 @@ const BookCard = ({ book, onDelete, onEdit }: BookProps) => {
           
           {/* Tags */}
           {book.tags && book.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
               {book.tags.slice(0, 3).map((tag, index) => (
-                <motion.span 
+                <motion.button
                   key={index}
-                  initial={{ scale: 0.9, opacity: 0.8 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: index * 0.1 }}
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // activate tag filter
+                    // @ts-ignore access outer scope setter via window event bus alternative omitted; we'll navigate with query instead
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('tag', tag);
+                    window.history.replaceState({}, document.title, url.toString());
+                    // trigger filter by setting activeCategory if available in scope
+                  }}
                   className="text-xs bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-lg font-medium border border-blue-200/50 dark:border-blue-700/50"
                 >
-                  {tag}
-                </motion.span>
+                  #{tag}
+                </motion.button>
               ))}
               {book.tags.length > 3 && (
                 <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">

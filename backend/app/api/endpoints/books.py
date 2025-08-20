@@ -35,9 +35,27 @@ from app.services.file_manager import FileManager
 router = APIRouter()
 
 
+def _split_tags(csv: str | None) -> List[str]:
+    if not csv:
+        return []
+    return [t.strip() for t in csv.split(',') if t.strip()]
+
+
+def _join_tags(items: List[str] | None) -> str | None:
+    if not items:
+        return None
+    return ','.join(sorted({t.strip() for t in items if t and t.strip()}))
+
+
 def _book_response_with_presigned_cover(book_obj) -> BookResponse:
     """Build a BookResponse without mutating the ORM object. Presign cover key for R2."""
     resp = BookResponse.model_validate(book_obj)
+    # Attach tags[] from stored CSV
+    try:
+        tags_csv = getattr(book_obj, 'tags', None)
+        resp.tags = _split_tags(tags_csv)
+    except Exception:
+        resp.tags = []
     try:
         if settings.STORAGE_BACKEND.lower() == "r2" and resp.cover_image_url:
             val = resp.cover_image_url
@@ -55,6 +73,12 @@ def _book_response_with_presigned_cover(book_obj) -> BookResponse:
 
 def _book_detail_with_presigned_cover(book_obj) -> BookDetailResponse:
     resp = BookDetailResponse.model_validate(book_obj)
+    # Attach tags[] from stored CSV
+    try:
+        tags_csv = getattr(book_obj, 'tags', None)
+        resp.tags = _split_tags(tags_csv)
+    except Exception:
+        resp.tags = []
     try:
         if settings.STORAGE_BACKEND.lower() == "r2" and resp.cover_image_url:
             val = resp.cover_image_url
@@ -76,6 +100,7 @@ async def create_book(
     title: str = Form(...),
     author: str = Form(None),
     description: str = Form(None),
+    tags: str = Form(None),
     file: UploadFile = File(...),
     cover_image: UploadFile = File(None),  # Optional cover image
     current_user: User = Depends(get_current_user),
@@ -160,6 +185,18 @@ async def create_book(
             cover_image_content=cover_image_content,
         )
         print(f"[UPLOAD] Book created id={book.id}")
+
+        # Save tags CSV on the created book
+        try:
+            tags_csv = _join_tags(_split_tags(tags))
+            if tags_csv is not None:
+                db_book = await db.get(type(book), book.id)
+                db_book.tags = tags_csv
+                await db.commit()
+                await db.refresh(db_book)
+                book = db_book
+        except Exception as te:
+            print(f"[UPLOAD][WARN] Failed to save tags for book {book.id}: {te}")
 
         # increment usage
         await usage_service.increment(current_user.id, 'book_uploads', 1)
@@ -269,8 +306,21 @@ async def update_book(
             detail="Not enough permissions",
         )
     
-    updated_book = await book_service.update_book(book_id, book_update)
-    return updated_book
+    # Handle tags update if provided
+    if book_update.tags is not None:
+        try:
+            tags_csv = _join_tags(book_update.tags)
+            db_book = await db.get(type(book), book.id)
+            db_book.tags = tags_csv
+            await db.commit()
+            await db.refresh(db_book)
+            book = db_book
+        except Exception as te:
+            print(f"[UPDATE][WARN] Failed to update tags for book {book.id}: {te}")
+    
+    updated_book = await book_service.update_book(book_id, BookUpdate(**{k:v for k,v in book_update.dict(exclude={'tags'}, exclude_unset=True).items()}))
+    # Compose final response with tags[]
+    return _book_response_with_presigned_cover(updated_book or book)
 
 
 @router.delete("/{book_id}", response_model=SuccessResponse)

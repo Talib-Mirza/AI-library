@@ -41,6 +41,9 @@ class Book(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     owner = relationship("User", foreign_keys=[user_id], back_populates="books")
     
+    # Tags (stored as comma-separated values)
+    tags = Column(Text, nullable=True)
+    
     # Dates
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

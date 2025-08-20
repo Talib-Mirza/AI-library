@@ -3,6 +3,30 @@ import { useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import api from '../utils/axiosConfig';
 
+// Simple cookie helpers for remember-me persistence
+function setCookie(name: string, value: string, days: number) {
+  const date = new Date();
+  date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+  const expires = `; expires=${date.toUTCString()}`;
+  const secure = (typeof window !== 'undefined' && window.location.protocol === 'https:') ? '; Secure' : '';
+  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}${expires}; Path=/${secure}; SameSite=Lax`;
+}
+function deleteCookie(name: string) {
+  const secure = (typeof window !== 'undefined' && window.location.protocol === 'https:') ? '; Secure' : '';
+  document.cookie = `${encodeURIComponent(name)}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/${secure}; SameSite=Lax`;
+}
+function getCookie(name: string): string | null {
+  const cname = encodeURIComponent(name) + '=';
+  const parts = document.cookie.split(';');
+  for (let part of parts) {
+    part = part.trim();
+    if (part.startsWith(cname)) {
+      return decodeURIComponent(part.substring(cname.length));
+    }
+  }
+  return null;
+}
+
 const RAW_BASE_URL = import.meta.env?.VITE_API_URL as string | undefined;
 const BASE_URL = (RAW_BASE_URL && RAW_BASE_URL.length)
   ? RAW_BASE_URL.replace(/\/$/, '')
@@ -30,7 +54,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   googleLogin: (credential: string) => Promise<void>;
   logout: () => void;
@@ -62,8 +86,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const scheduleRefresh = () => {
       // Refresh a bit before expiry; using 20 minutes as a safe window for a 30-minute access token
       refreshTimer = setInterval(async () => {
-        const refreshToken = localStorage.getItem('refresh_token');
-        const userId = localStorage.getItem('user_id');
+        const refreshToken = localStorage.getItem('refresh_token') || getCookie('refresh_token');
+        const userId = localStorage.getItem('user_id') || getCookie('user_id');
         if (!refreshToken || !userId) return;
         try {
           const res = await fetch(`${BASE_URL}/auth/refresh`, {
@@ -75,6 +99,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             const data = await res.json();
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('refresh_token', data.refresh_token);
+            // Keep cookies in sync if present
+            if (getCookie('token')) setCookie('token', data.access_token, 7);
+            if (getCookie('refresh_token')) setCookie('refresh_token', data.refresh_token, 7);
           }
         } catch {}
       }, 20 * 60 * 1000);
@@ -89,8 +116,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       (resp) => resp,
       async (error) => {
         if (error.response?.status === 401) {
-          const refreshToken = localStorage.getItem('refresh_token');
-          const userId = localStorage.getItem('user_id');
+          const refreshToken = localStorage.getItem('refresh_token') || getCookie('refresh_token');
+          const userId = localStorage.getItem('user_id') || getCookie('user_id');
           if (refreshToken && userId) {
             try {
               const res = await fetch(`${BASE_URL}/auth/refresh`, {
@@ -102,6 +129,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 const data = await res.json();
                 localStorage.setItem('token', data.access_token);
                 localStorage.setItem('refresh_token', data.refresh_token);
+                if (getCookie('token')) setCookie('token', data.access_token, 7);
+                if (getCookie('refresh_token')) setCookie('refresh_token', data.refresh_token, 7);
                 // retry original request
                 error.config.headers.Authorization = `Bearer ${data.access_token}`;
                 return api.request(error.config);
@@ -112,6 +141,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           localStorage.removeItem('token');
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('user_id');
+          deleteCookie('token');
+          deleteCookie('refresh_token');
+          deleteCookie('user_id');
           setUser(null);
           navigate('/login');
         }
@@ -124,7 +156,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     // Check if user is already logged in
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
+      let token = localStorage.getItem('token');
+      let refreshToken = localStorage.getItem('refresh_token');
+      let uid = localStorage.getItem('user_id');
+
+      // Hydrate from cookies if localStorage empty
+      if (!token) token = getCookie('token') || token;
+      if (!refreshToken) refreshToken = getCookie('refresh_token') || refreshToken;
+      if (!uid) uid = getCookie('user_id') || uid;
+      if (token) localStorage.setItem('token', token);
+      if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+      if (uid) localStorage.setItem('user_id', uid);
       
       if (token) {
         try {
@@ -139,17 +181,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             const userData = await response.json();
             setUser(userData);
             localStorage.setItem('user_id', String(userData.id));
+            if (getCookie('user_id')) setCookie('user_id', String(userData.id), 7);
           } else {
             // If token is invalid, clear it
             localStorage.removeItem('token');
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user_id');
+            deleteCookie('token');
+            deleteCookie('refresh_token');
+            deleteCookie('user_id');
           }
         } catch (error) {
           console.error('Error checking authentication:', error);
           localStorage.removeItem('token');
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('user_id');
+          deleteCookie('token');
+          deleteCookie('refresh_token');
+          deleteCookie('user_id');
         }
       }
       
@@ -159,7 +208,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     checkAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, rememberMe: boolean = false) => {
     setIsLoading(true);
     
     try {
@@ -188,6 +237,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
 
+      // Persist via cookies when rememberMe is true (7 days default)
+      if (rememberMe) {
+        setCookie('token', data.access_token, 7);
+        setCookie('refresh_token', data.refresh_token, 7);
+      } else {
+        deleteCookie('token');
+        deleteCookie('refresh_token');
+      }
+
       // Get user data
       const userResponse = await fetch(`${BASE_URL}/auth/me`, {
         headers: {
@@ -202,6 +260,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const userData = await userResponse.json();
       setUser(userData);
       localStorage.setItem('user_id', String(userData.id));
+      if (rememberMe) setCookie('user_id', String(userData.id), 7);
       
       // Navigate to dashboard after successful login
       navigate('/dashboard');
@@ -225,7 +284,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         body: JSON.stringify({ full_name: name, email, password }),
       });
       
-      if (!registerResponse.ok) {
+    if (!registerResponse.ok) {
         let detail = 'Registration failed';
         try {
           const err = await registerResponse.json();
@@ -264,6 +323,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const data = await response.json();
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
+      // Default: persist cookies (Google users expect one-tap convenience)
+      setCookie('token', data.access_token, 7);
+      setCookie('refresh_token', data.refresh_token, 7);
 
       // Get user data
       const userResponse = await fetch(`${BASE_URL}/auth/me`, {
@@ -279,6 +341,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const userData = await userResponse.json();
       setUser(userData);
       localStorage.setItem('user_id', String(userData.id));
+      setCookie('user_id', String(userData.id), 7);
       
       // Navigate to dashboard after successful login
       navigate('/dashboard');
@@ -294,6 +357,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_id');
+    deleteCookie('token');
+    deleteCookie('refresh_token');
+    deleteCookie('user_id');
     setUser(null);
     navigate('/login');
   };

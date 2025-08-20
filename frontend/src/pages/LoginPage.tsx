@@ -94,7 +94,7 @@ const LoginPage = () => {
     setIsSubmitting(true);
     
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       toast.success('Successfully logged in!');
       
       // Redirect to the page they tried to visit or dashboard

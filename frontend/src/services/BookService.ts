@@ -48,6 +48,12 @@ class BookService {
       isProcessed: bookData.is_processed !== undefined ? bookData.is_processed : bookData.isProcessed,
       processingError: bookData.processing_error || bookData.processingError,
       fileSize: bookData.file_size || bookData.fileSize,
+      // Normalize tags to array of strings
+      tags: Array.isArray(bookData.tags)
+        ? bookData.tags
+        : (typeof bookData.tags === 'string' && bookData.tags.length
+            ? bookData.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t.length)
+            : (bookData.tags || [])),
     };
   }
 

@@ -48,7 +48,8 @@ class BookCreate(BaseModel):
     title: str
     author: Optional[str] = None
     description: Optional[str] = None
-    # The file itself is uploaded separately
+    # Optional tags provided as a comma-separated string via Form in endpoint
+    # The endpoint will parse and store this
 
 
 # Response schemas
@@ -126,6 +127,7 @@ class BookResponse(BaseModel):
     user_id: int
     created_at: str
     updated_at: str
+    tags: Optional[List[str]] = []
     
     @field_validator('created_at', 'updated_at', mode='before')
     @classmethod
@@ -171,4 +173,6 @@ class BookUpdate(BaseModel):
     """Book update model."""
     title: Optional[str] = None
     author: Optional[str] = None
-    description: Optional[str] = None 
+    description: Optional[str] = None
+    # Optionally allow tags update as list
+    tags: Optional[List[str]] = None 
