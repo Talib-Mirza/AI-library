@@ -122,6 +122,19 @@ const UserProfilePage: React.FC = () => {
   const handleDeleteAccount = async () => {
     try {
       await axios.delete('/auth/account');
+      // Best-effort: revoke Google app access if GSI is available
+      try {
+        // @ts-ignore
+        const gsi = window?.google?.accounts?.id;
+        if (gsi && user?.email) {
+          // @ts-ignore
+          window.google.accounts.id.revoke(user.email, () => {
+            console.log('[Google] App access revoked for', user.email);
+          });
+        }
+      } catch (e) {
+        console.warn('[Google] Revoke failed or unavailable', e);
+      }
       toast.success('Account deleted successfully');
       logout();
       navigate('/');
