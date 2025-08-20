@@ -251,8 +251,20 @@ async def embed_book(
         if book.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Not authorized to access this book")
         
-        # Get book content
+        # Ensure book content is available; if not, process on-demand
         if not book.is_processed or not book.text_content:
+            try:
+                print(f"[RAG] Book {book_id} not processed or empty content. Processing now...")
+                _ = await book_service.get_book_content(book_id, current_user.id)
+                # Re-fetch to get updated fields
+                book = await book_service.get_book_by_id(book_id)
+                print(f"[RAG] Processing complete. is_processed={book.is_processed}, text_len={len(book.text_content or '')}")
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to prepare book content: {e}")
+        
+        if not book.text_content:
             raise HTTPException(status_code=400, detail="Book content not available")
         
         # Prepare metadata
