@@ -349,12 +349,12 @@ class UserService:
             user_id: User ID.
         """
         async with async_session_factory() as session:
-            user = await self.get_by_id(user_id)
-            if not user:
+            # Load and delete in the SAME session to avoid cross-session issues
+            db_user = await session.get(User, user_id)
+            if not db_user:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="User not found"
                 )
-            
-            await session.delete(user)
+            await session.delete(db_user)
             await session.commit() 
