@@ -26,13 +26,25 @@ class GoogleOAuthSecurityMiddleware(BaseHTTPMiddleware):
                 if settings.EFFECTIVE_FRONTEND_URL:
                     connect_sources.append(settings.EFFECTIVE_FRONTEND_URL)
 
+            # Allow images from Cloudflare R2 endpoint if configured
+            img_sources = ["'self'", "data:", "blob:"]
+            try:
+                if settings.R2_ENDPOINT:
+                    # Normalize to scheme+host
+                    endpoint = settings.R2_ENDPOINT.strip().strip('"').strip("'")
+                    # Only allow the host pattern
+                    if endpoint.startswith("http"):
+                        img_sources.append(endpoint)
+            except Exception:
+                pass
+
             csp_policy = [
                 "default-src 'self'",
                 "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com/gsi/client",
                 "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
                 "frame-src 'self' https://accounts.google.com/gsi/",
                 f"connect-src {' '.join(connect_sources)}",
-                "img-src 'self' data: blob:",
+                f"img-src {' '.join(img_sources)}",
                 "font-src 'self' data:",
                 "media-src 'self' blob: data:",
                 "worker-src 'self' blob:",

@@ -335,3 +335,53 @@ class FileManager:
 		tmp.flush()
 		tmp.close()
 		return tmp.name 
+
+	def delete_r2_prefix(self, prefix: str) -> bool:
+		"""Delete all objects under a given R2 key prefix. Returns True if succeeds."""
+		if not self.is_r2:
+			# For local, remove directory if exists
+			try:
+				base = Path(self.uploads_dir)
+				dir_path = base / prefix
+				if dir_path.exists():
+					shutil.rmtree(dir_path)
+				return True
+			except Exception as e:
+				print(f"[R2][DELETE][LOCAL] Failed to delete prefix {prefix}: {e}")
+				return False
+		try:
+			s3 = self._ensure_s3()
+			continuation_token = None
+			to_delete: List[Dict[str, str]] = []
+			while True:
+				kwargs: Dict[str, Any] = {"Bucket": self.bucket, "Prefix": prefix}
+				if continuation_token:
+					kwargs["ContinuationToken"] = continuation_token
+				resp = s3.list_objects_v2(**kwargs)
+				contents = resp.get("Contents", [])
+				for obj in contents:
+					to_delete.append({"Key": obj["Key"]})
+				if resp.get("IsTruncated") and resp.get("NextContinuationToken"):
+					continuation_token = resp.get("NextContinuationToken")
+				else:
+					break
+				# Batch delete in chunks of 1000
+				if to_delete:
+					for i in range(0, len(to_delete), 1000):
+						batch = to_delete[i:i+1000]
+						if batch:
+							s3.delete_objects(Bucket=self.bucket, Delete={"Objects": batch, "Quiet": True})
+			return True
+		except Exception as e:
+			print(f"[R2][DELETE] Failed to delete prefix {prefix}: {e}")
+			return False
+	
+	def delete_book_folder(self, user_id: int, book_id: str) -> bool:
+		"""Delete a single book folder (users/{user_id}/{book_id}/)."""
+		prefix = f"{self._r2_key_prefix(user_id, book_id)}/"
+		return self.delete_r2_prefix(prefix)
+	
+	def delete_user_folder(self, user_id: int) -> bool:
+		"""Delete entire user folder (users/{user_id}/)."""
+		prefix = f"users/{user_id}/"
+		return self.delete_r2_prefix(prefix) 

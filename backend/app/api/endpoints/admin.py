@@ -135,13 +135,37 @@ async def delete_user(
 ) -> Any:
     if user_id == current_admin.id:
         raise HTTPException(status_code=400, detail="Admins cannot delete their own account")
-    async with async_session_factory() as session:
-        db_user = await session.get(User, user_id)
-        if not db_user:
-            raise HTTPException(status_code=404, detail="User not found")
-        await session.delete(db_user)
-        await session.commit()
+    from app.services.file_manager import FileManager
+    fm = FileManager()
+    try:
+        # Delete user in DB (cascade removes books)
+        async with async_session_factory() as session:
+            db_user = await session.get(User, user_id)
+            if not db_user:
+                raise HTTPException(status_code=404, detail="User not found")
+            await session.delete(db_user)
+            await session.commit()
+        # After DB commit, remove storage folder
+        try:
+            if fm.is_r2:
+                ok = fm.delete_user_folder(user_id)
+                print(f"[ADMIN][DELETE_USER] R2 delete users/{user_id}/ -> {ok}")
+            else:
+                # Clean local uploads
+                from pathlib import Path
+                user_dir = Path(fm.uploads_dir) / str(user_id)
+                import shutil
+                if user_dir.exists():
+                    shutil.rmtree(user_dir)
+                print(f"[ADMIN][DELETE_USER] Local delete uploads/{user_id}/ done")
+        except Exception as se:
+            print(f"[ADMIN][DELETE_USER][WARN] Storage cleanup failed for user {user_id}: {se}")
         return {"message": "User deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ADMIN][DELETE_USER][ERROR] {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete user")
 
 @router.post("/users/{user_id}/recompute-totals")
 async def admin_recompute_totals_for_user(

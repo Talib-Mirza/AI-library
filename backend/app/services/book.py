@@ -324,7 +324,10 @@ class BookService:
             # Delete the entire book directory with all its contents (using book_id)
             try:
                 print(f"Deleting book directory for user {user_id}, book_id {book_id}")
-                success = self.file_manager.delete_pdf_directory(user_id, str(book_id))
+                if settings.STORAGE_BACKEND.lower() == "r2":
+                    success = self.file_manager.delete_book_folder(user_id, str(book_id))
+                else:
+                    success = self.file_manager.delete_pdf_directory(user_id, str(book_id))
                 if not success:
                     print(f"Warning: Could not delete book directory for book {book_id}")
             except Exception as e:
