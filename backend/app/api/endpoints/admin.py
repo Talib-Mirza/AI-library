@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 from sqlalchemy import delete
+import stripe
 
 from app.auth.dependencies import get_current_admin_user
 from app.db.session import get_db, async_session_factory
@@ -145,6 +146,21 @@ async def delete_user(
             db_user = await session.get(User, user_id)
             if not db_user:
                 raise HTTPException(status_code=404, detail="User not found")
+            # Best-effort: cancel Stripe subscriptions before deletion
+            try:
+                if db_user.stripe_customer_id:
+                    subs = stripe.Subscription.list(customer=db_user.stripe_customer_id, status='all', limit=10)
+                    for s in subs.auto_paging_iter():
+                        st = s.get('status')
+                        sid = s.get('id')
+                        if st in ('active','trialing'):
+                            try:
+                                stripe.Subscription.cancel(sid)
+                                print(f"[ADMIN][DELETE_USER] Canceled Stripe subscription {sid} for customer {db_user.stripe_customer_id}")
+                            except Exception as ce:
+                                print(f"[ADMIN][DELETE_USER][WARN] Failed to cancel subscription {sid}: {ce}")
+            except Exception as se:
+                print(f"[ADMIN][DELETE_USER][WARN] Stripe cancel failed: {se}")
             # Explicitly delete password reset tokens to avoid NOT NULL updates
             try:
                 await session.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user_id))
