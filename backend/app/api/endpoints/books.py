@@ -4,7 +4,7 @@ from typing import Any, List, Dict
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi import Request
 
 from app.auth.dependencies import get_current_user, require_within_upload_quota
@@ -383,14 +383,30 @@ async def get_book_content(
         # Get file path
         file_path = book.file_path
         
-        # If using R2, file_path holds the object key. Redirect to presigned URL.
+        # If using R2, stream via backend to avoid CORS
         if settings.STORAGE_BACKEND.lower() == "r2":
             fm = FileManager()
             try:
-                url = fm.generate_presigned_get_url(file_path)
-                return RedirectResponse(url, status_code=302)
+                tmp_path = fm.download_object_to_temp(file_path, suffix=".pdf")
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to generate download URL: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to fetch file from storage: {e}")
+            
+            if not tmp_path or not os.path.exists(tmp_path):
+                raise HTTPException(status_code=404, detail="File not found on disk")
+            
+            def _iterfile():
+                with open(tmp_path, "rb") as f:
+                    while True:
+                        chunk = f.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        yield chunk
+            headers = {
+                "Content-Disposition": f"attachment; filename=\"{os.path.basename(file_path)}\""
+            }
+            # Return raw file stream (PDF or other) via backend
+            media = "application/pdf" if book.file_type == FileType.PDF else "application/octet-stream"
+            return StreamingResponse(_iterfile(), media_type=media, headers=headers)
         
         # Check if file exists
         if not os.path.exists(file_path):
@@ -486,12 +502,27 @@ async def get_book_pdf(
         file_path = book.file_path
         
         if settings.STORAGE_BACKEND.lower() == "r2":
+            # Stream the PDF through the backend to avoid R2 CORS
             fm = FileManager()
             try:
-                url = fm.generate_presigned_get_url(file_path)
-                return RedirectResponse(url, status_code=302)
+                tmp_path = fm.download_object_to_temp(file_path, suffix=".pdf")
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to generate PDF URL: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to fetch PDF from storage: {e}")
+            
+            if not tmp_path or not os.path.exists(tmp_path):
+                raise HTTPException(status_code=404, detail="PDF file not found")
+            
+            def _iterfile():
+                with open(tmp_path, "rb") as f:
+                    while True:
+                        chunk = f.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        yield chunk
+            headers = {
+                "Content-Disposition": f"inline; filename=\"{os.path.basename(file_path)}\""
+            }
+            return StreamingResponse(_iterfile(), media_type="application/pdf", headers=headers)
         
         # Check if file exists
         if not os.path.exists(file_path):
