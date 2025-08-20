@@ -156,8 +156,23 @@ class BookService:
                 print(f"Processing book: {book.title} ({book.file_type})")
                 
                 if book.file_type == FileType.PDF:
+                    # Prepare source path depending on storage backend
+                    source_path = book.file_path
+                    if settings.STORAGE_BACKEND.lower() == "r2":
+                        try:
+                            print("[PROCESS] Downloading from R2 to temp for processing ...")
+                            source_path = self.file_manager.download_object_to_temp(book.file_path, suffix=".pdf")
+                            print(f"[PROCESS] Temp file for processing: {source_path}")
+                        except Exception as e:
+                            print(f"[PROCESS][ERROR] R2 download failed: {e}")
+                            print(traceback.format_exc())
+                            raise
+                    
+                    if not source_path or not os.path.exists(source_path):
+                        raise FileNotFoundError(f"PDF file not found: {source_path}")
+                    
                     # Process PDF content
-                    content = self.pdf_processor.process_pdf(book.file_path)
+                    content = self.pdf_processor.process_pdf(source_path)
                     
                     # Update book with processed content
                     book.is_processed = True
@@ -425,7 +440,7 @@ class BookService:
         """Get all annotations for a book."""
         session = self.db
         
-        result = await session.execute(
+        result = await self.db.execute(
             select(Annotation)
             .where(Annotation.book_id == book_id)
             .order_by(Annotation.page)

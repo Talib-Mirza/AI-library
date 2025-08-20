@@ -387,11 +387,7 @@ async def get_book_content(
         if settings.STORAGE_BACKEND.lower() == "r2":
             fm = FileManager()
             try:
-                url = fm.s3.generate_presigned_url(
-                    "get_object",
-                    Params={"Bucket": fm.bucket, "Key": file_path},
-                    ExpiresIn=settings.R2_PRESIGN_TTL_SECONDS,
-                )
+                url = fm.generate_presigned_get_url(file_path)
                 return RedirectResponse(url, status_code=302)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Failed to generate download URL: {e}")
@@ -492,11 +488,7 @@ async def get_book_pdf(
         if settings.STORAGE_BACKEND.lower() == "r2":
             fm = FileManager()
             try:
-                url = fm.s3.generate_presigned_url(
-                    "get_object",
-                    Params={"Bucket": fm.bucket, "Key": file_path},
-                    ExpiresIn=settings.R2_PRESIGN_TTL_SECONDS,
-                )
+                url = fm.generate_presigned_get_url(file_path)
                 return RedirectResponse(url, status_code=302)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Failed to generate PDF URL: {e}")
