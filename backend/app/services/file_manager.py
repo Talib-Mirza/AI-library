@@ -142,6 +142,8 @@ class FileManager:
 		Save processed PDF content as JSON (local only cache for processing).
 		"""
 		pdf_dir = self.get_pdf_directory(user_id, pdf_id)
+		# Ensure directory exists for local cache even when using R2
+		pdf_dir.mkdir(parents=True, exist_ok=True)
 		content_json = json.dumps(content, indent=2, ensure_ascii=False)
 		content_bytes = content_json.encode('utf-8')
 		if len(content_bytes) > self.max_json_size:
@@ -177,6 +179,7 @@ class FileManager:
 	
 	def save_metadata(self, user_id: int, pdf_id: str, metadata: Dict[str, Any]) -> str:
 		pdf_dir = self.get_pdf_directory(user_id, pdf_id)
+		pdf_dir.mkdir(parents=True, exist_ok=True)
 		metadata_file = pdf_dir / "metadata.json"
 		with open(metadata_file, 'w', encoding='utf-8') as f:
 			json.dump(metadata, f, indent=2, ensure_ascii=False, default=str)
@@ -184,6 +187,7 @@ class FileManager:
 	
 	def save_images(self, user_id: int, pdf_id: str, images: List[Dict]) -> str:
 		pdf_dir = self.get_pdf_directory(user_id, pdf_id)
+		pdf_dir.mkdir(parents=True, exist_ok=True)
 		images_dir = pdf_dir / "images"
 		images_dir.mkdir(exist_ok=True)
 		images_file = images_dir / "images.json"
