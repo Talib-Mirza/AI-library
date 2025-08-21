@@ -692,7 +692,7 @@ const DashboardPage = () => {
                             <span> or drag and drop</span>
                           </div>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            PDF, EPUB, or TXT up to 10MB
+                            PDF up to 10MB
                           </p>
                           {selectedFile && (
                             <motion.p 
