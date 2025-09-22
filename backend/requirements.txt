@@ -38,6 +38,7 @@ langchain-text-splitters==0.3.0
 openai==1.77.0
 google-generativeai==0.3.2
 tiktoken==0.8.0
+aiofiles==24.1.0
 
 # Vector Stores & Embeddings
 faiss-cpu==1.7.4
@@ -70,4 +71,5 @@ email-validator==2.1.1
 
 # HTTP Client
 httpx==0.28.1 
-aiohttp==3.8.6 
+aiohttp==3.8.6
+aiofiles==23.2.1 

@@ -121,7 +121,7 @@ async def ask_question(
     Ask a question about an embedded document
     """
     try:
-        # Use user-specific document ID
+        logger.info(f"[RAG] /ask received user={current_user.id} doc={request.document_id} qlen={len(request.question or '')}")
         user_document_id = f"user_{current_user.id}_doc_{request.document_id}"
         
         # Ask the question
@@ -136,6 +136,7 @@ async def ask_question(
         
         # increment usage
         await usage_service.increment(current_user.id, 'ai_queries', 1)
+        logger.info(f"[RAG] /ask sending answer len={len(result.get('answer',''))} sources={len(result.get('sources',[]))}")
         
         return AskQuestionResponse(
             answer=result["answer"],
@@ -147,7 +148,7 @@ async def ask_question(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error asking question: {str(e)}")
+        logger.error(f"[RAG] /ask error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to process question: {str(e)}")
 
 @router.get("/documents")
@@ -325,7 +326,7 @@ async def ask_question_about_book(
     try:
         question = request.get("question")
         conversation_history = request.get("conversation_history", [])
-        
+        logger.info(f"[RAG] /books/{book_id}/ask received user={current_user.id} qlen={len(question or '')} hist={len(conversation_history)}")
         if not question:
             raise HTTPException(status_code=400, detail="Question is required")
         
@@ -355,20 +356,14 @@ async def ask_question_about_book(
         
         # increment usage
         await usage_service.increment(current_user.id, 'ai_queries', 1)
-        
-        # Add book information to response
-        result["book"] = {
-            "id": book.id,
-            "title": book.title,
-            "author": book.author
-        }
-        
+        result["book"] = {"id": book.id, "title": book.title, "author": book.author}
+        logger.info(f"[RAG] /books/{book_id}/ask sending answer len={len(result.get('answer',''))} sources={len(result.get('sources',[]))}")
         return result
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error asking question about book {book_id}: {str(e)}")
+        logger.error(f"[RAG] Error asking question about book {book_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to process question: {str(e)}")
 
 @router.get("/books/{book_id}/stats")

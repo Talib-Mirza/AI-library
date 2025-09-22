@@ -11,6 +11,20 @@ import ModernPDFViewer from '../components/pdf/ModernPDFViewer';
 import type { PDFTextSpan } from '../services/OptimizedPDFService';
 import ErrorBoundary from '../components/ErrorBoundary';
 import TTSControls from '../components/TTS/TTSControls';
+import sttService from '../services/STTService';
+import { useConversationMode } from '../hooks/useConversationMode';
+import ConversationVisualizer from '../components/ConversationVisualizer';
+
+// Simple VAD-lite parameters
+const SILENCE_THRESHOLD = 0.02; // Base RMS threshold (used until dynamic threshold calibrates)
+const SILENCE_DURATION_MS = 3000; // stop after 3s of sustained silence
+const DEBUG_STT = import.meta.env?.MODE === 'development';
+const NOISE_CALIBRATION_MS = 800; // first 0.8s used to estimate noise floor
+const MAX_RECORDING_MS = 90000; // hard stop at 90s
+const MIN_RECORDING_MS = 1500; // require at least 1.5s of recording before auto-stop
+const MIN_DYNAMIC_THRESHOLD = 0.008;
+const MAX_DYNAMIC_THRESHOLD = 0.06;
+const THRESHOLD_MULTIPLIER = 2.0; // dynamic threshold = noiseFloor * multiplier
 
 // Typing animation component
 interface TypingAnimationProps {
@@ -84,7 +98,42 @@ const BookDetailsPage = () => {
   
   // PDF viewer container ref for TTS
   const pdfViewerRef = useRef<HTMLDivElement>(null);
-  
+  // Conversation Mode hook
+  const conv = useConversationMode({
+    onQuery: async (text: string) => {
+      if (!book) return '';
+      const history = formatConversationHistory(chatHistory);
+      const result = await ragService.askQuestionAboutBook(
+        book.id,
+        text,
+        history.length > 0 ? history : undefined
+      );
+      // Record to chat display (user + assistant)
+      setChatHistory(prev => [...prev, { role: 'user', content: text }, { role: 'model', content: result.answer }]);
+      return result.answer;
+    }
+  });
+  // STT recording refs/state
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const silenceTimerRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const recordedChunksRef = useRef<BlobPart[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const lastVadLogRef = useRef<number>(0);
+  const recordStartTimeRef = useRef<number>(0);
+  const speechHeardRef = useRef<boolean>(false);
+  const vadNoiseSumRef = useRef<number>(0);
+  const vadNoiseCountRef = useRef<number>(0);
+  const vadDynamicThresholdRef = useRef<number | null>(null);
+  const lastSpeechStateRef = useRef<boolean>(false);
+  const noSpeechStopTimerRef = useRef<number | null>(null);
+  const speechMsRef = useRef<number>(0);
+  const lastFrameTimeRef = useRef<number>(0);
+
   // New state for book viewer customization
   const [backgroundColor, setBackgroundColor] = useState('bg-white dark:bg-gray-900');
   const [textColor, setTextColor] = useState('text-gray-700 dark:text-gray-300');
@@ -183,23 +232,24 @@ const BookDetailsPage = () => {
     }));
   };
   
-  const handleSendMessage = async () => {
-    if (!chatMessage.trim() || isSending || !book) return;
+  const handleSendMessage = async (messageOverride?: string) => {
+    const message = messageOverride ?? chatMessage;
+    if (!message.trim() || isSending || !book) return;
     
     try {
       setIsSending(true);
       
       // Add user's message to chat
-      const newChatHistory: Message[] = [...chatHistory, { role: 'user', content: chatMessage }];
+      const newChatHistory: Message[] = [...chatHistory, { role: 'user', content: message }];
       setChatHistory(newChatHistory);
       
       // Prepare conversation history for RAG service
       const conversationHistory = formatConversationHistory(newChatHistory);
       
       // Build question with selected text context if available
-      let question = chatMessage;
+      let question = message;
       if (selectedText) {
-        question = `Context from the book: "${selectedText}"\n\nQuestion: ${chatMessage}`;
+        question = `Context from the book: "${selectedText}"\n\nQuestion: ${message}`;
         setRelevantContext(`Selected text: ${selectedText}`);
       }
       
@@ -228,18 +278,243 @@ const BookDetailsPage = () => {
       if (error instanceof QuotaError || error?.response?.status === 402) {
         toast.error('AI chat limit reached for your plan. Please wait for reset.');
         setChatHistory([...chatHistory, 
-          { role: 'user', content: chatMessage },
+          { role: 'user', content: message },
           { role: 'model', content: "You've reached your AI chat limit for this period. Please wait for reset.", isTyping: true }
         ]);
       } else {
         toast.error('Failed to get response from AI. Please try again.');
         setChatHistory([...chatHistory, 
-          { role: 'user', content: chatMessage },
+          { role: 'user', content: message },
           { role: 'model', content: "I'm sorry, I encountered an error processing your request. Please try again.", isTyping: true }
         ]);
       }
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // Audio energy monitor for simple VAD-lite
+  const startSilenceMonitoring = () => {
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    const check = () => {
+      analyser.getByteTimeDomainData(data);
+      // Compute RMS
+      let sumSquares = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = (data[i] - 128) / 128;
+        sumSquares += v * v;
+      }
+      const rms = Math.sqrt(sumSquares / data.length);
+
+      const now = performance.now();
+      if (!lastFrameTimeRef.current) lastFrameTimeRef.current = now;
+      const dt = now - lastFrameTimeRef.current;
+      lastFrameTimeRef.current = now;
+      const elapsedFromStart = now - recordStartTimeRef.current;
+
+      // Calibration phase: estimate noise floor
+      if (elapsedFromStart < NOISE_CALIBRATION_MS) {
+        vadNoiseSumRef.current += rms;
+        vadNoiseCountRef.current += 1;
+        if (DEBUG_STT) {
+          if (!lastVadLogRef.current || now - lastVadLogRef.current > 3000) {
+            lastVadLogRef.current = now;
+            console.debug('[STT] Calibrating noise floor... rms=', rms.toFixed(4));
+          }
+        }
+      } else if (vadDynamicThresholdRef.current == null && vadNoiseCountRef.current > 0) {
+        const noiseFloor = vadNoiseSumRef.current / Math.max(1, vadNoiseCountRef.current);
+        const dynamicThreshold = Math.min(
+          MAX_DYNAMIC_THRESHOLD,
+          Math.max(MIN_DYNAMIC_THRESHOLD, noiseFloor * THRESHOLD_MULTIPLIER)
+        );
+        vadDynamicThresholdRef.current = dynamicThreshold;
+        if (DEBUG_STT) console.debug('[STT] Noise floor=', noiseFloor.toFixed(4), 'dynamicThreshold=', dynamicThreshold.toFixed(4));
+      }
+
+      const currentThreshold = vadDynamicThresholdRef.current ?? SILENCE_THRESHOLD;
+      const isSilent = rms < currentThreshold;
+      if (!isSilent) {
+        speechHeardRef.current = true;
+        speechMsRef.current += dt;
+        // Reset silence timer on any speech activity
+        silenceTimerRef.current = null;
+      }
+      if (DEBUG_STT) {
+        const elapsedSilent = silenceTimerRef.current == null ? 0 : (now - (silenceTimerRef.current as number));
+        if (!lastVadLogRef.current || now - lastVadLogRef.current > 3000) {
+          lastVadLogRef.current = now;
+          console.debug('[STT]', isSilent ? 'SILENCE' : 'SPEECH', 'rms=', rms.toFixed(4), 'thr=', currentThreshold.toFixed(4), 'silentMs=', Math.floor(elapsedSilent));
+        }
+        if (lastSpeechStateRef.current !== !isSilent) {
+          lastSpeechStateRef.current = !isSilent;
+          console.debug('[STT] State changed:', !isSilent ? 'SPEECH_START' : 'SPEECH_END');
+        }
+      }
+      if (isSilent) {
+        if (silenceTimerRef.current == null) {
+          silenceTimerRef.current = now;
+        } else if (
+          (now - silenceTimerRef.current > SILENCE_DURATION_MS) &&
+          (elapsedFromStart > MIN_RECORDING_MS)
+        ) {
+          // Auto-stop after continuous silence window following last speech
+          stopRecording();
+          return;
+        }
+      }
+
+      // Safety max duration stop
+      if (elapsedFromStart >= MAX_RECORDING_MS) {
+        if (DEBUG_STT) console.debug('[STT] Max recording duration reached, auto-stopping');
+        stopRecording();
+        return;
+      }
+
+      rafRef.current = requestAnimationFrame(check);
+    };
+
+    lastFrameTimeRef.current = performance.now();
+    rafRef.current = requestAnimationFrame(check);
+  };
+
+  const stopMonitoring = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    silenceTimerRef.current = null;
+  };
+
+  const cleanupAudioGraph = () => {
+    try { analyserRef.current?.disconnect(); } catch {}
+    try { sourceRef.current?.disconnect(); } catch {}
+    analyserRef.current = null;
+    sourceRef.current = null;
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+    }
+    audioContextRef.current = null;
+  };
+
+  const stopRecording = async () => {
+    try {
+      stopMonitoring();
+      setIsRecording(false);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.requestData(); } catch {}
+        mediaRecorderRef.current.stop();
+      }
+      // stop tracks
+      mediaStreamRef.current?.getTracks().forEach(t => t.stop());
+      mediaStreamRef.current = null;
+      if (noSpeechStopTimerRef.current) { clearTimeout(noSpeechStopTimerRef.current); noSpeechStopTimerRef.current = null; }
+    } catch {}
+  };
+
+  const startRecording = async () => {
+    try {
+      if (isRecording) {
+        await stopRecording();
+        return;
+      }
+      recordedChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true, autoGainControl: true } });
+      mediaStreamRef.current = stream;
+      recordStartTimeRef.current = performance.now();
+      speechHeardRef.current = false;
+      vadNoiseSumRef.current = 0;
+      vadNoiseCountRef.current = 0;
+      vadDynamicThresholdRef.current = null;
+      lastSpeechStateRef.current = false;
+      speechMsRef.current = 0;
+
+      // Setup MediaRecorder
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+      const mr = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 128_000 });
+      mediaRecorderRef.current = mr;
+      mr.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+          if (DEBUG_STT) console.debug('[STT] Chunk received, size=', e.data.size, 'totalChunks=', recordedChunksRef.current.length);
+        }
+      };
+      mr.onerror = (e: any) => { console.error('[STT] MediaRecorder error:', e?.error || e); };
+      mr.onstop = async () => {
+        cleanupAudioGraph();
+        if (noSpeechStopTimerRef.current) { clearTimeout(noSpeechStopTimerRef.current); noSpeechStopTimerRef.current = null; }
+        const blob = new Blob(recordedChunksRef.current, { type: mime });
+        if (!blob || blob.size < 1000) {
+          toast.error('No audio captured');
+          return;
+        }
+        // If we never detected speech or it was too brief, skip upload and query entirely
+        if (!speechHeardRef.current || speechMsRef.current < 300) {
+          if (DEBUG_STT) console.debug('[STT] Skipping upload: speechMs=', speechMsRef.current);
+          toast.error('No speech detected');
+          return;
+        }
+        try {
+          if (DEBUG_STT) console.debug('[STT] Uploading blob size (bytes):', blob.size);
+          if (DEBUG_STT) {
+            const url = URL.createObjectURL(blob);
+            console.debug('[STT] Dev playback URL:', url);
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+          }
+          toast.loading('Transcribing...', { id: 'stt' });
+          const transcript = await sttService.transcribe(blob);
+          if (DEBUG_STT) console.debug('[STT] Transcript:', transcript);
+          toast.success('Transcription complete', { id: 'stt' });
+          // Send transcript into chat immediately
+          if (!transcript || !transcript.trim()) {
+            toast.error('No speech detected');
+            return;
+          }
+          if (!/[\p{L}\p{N}]/u.test(transcript)) {
+            toast.error('No words detected');
+            return;
+          }
+          await handleSendMessage(transcript);
+        } catch (e: any) {
+          const detail = e?.response?.data?.detail || e?.message || '';
+          if (e?.response?.status === 400 || /No (transcription|words) detected/i.test(detail)) {
+            toast.error('No speech detected', { id: 'stt' });
+          } else {
+            toast.error('Transcription failed', { id: 'stt' });
+          }
+        }
+      };
+
+      // Web Audio graph for VAD-lite
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      sourceRef.current = source;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.4;
+      analyserRef.current = analyser;
+      source.connect(analyser);
+
+      // Start
+      mr.start(1000);
+      setIsRecording(true);
+      startSilenceMonitoring();
+      // Fallback: if no speech detected at all for 20s, stop to avoid hanging
+      noSpeechStopTimerRef.current = window.setTimeout(() => {
+        if (!speechHeardRef.current && isRecording) {
+          if (DEBUG_STT) console.debug('[STT] No speech detected for 20s, auto-stopping');
+          stopRecording();
+        }
+      }, 20000) as unknown as number;
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Microphone access failed');
+      setIsRecording(false);
+      cleanupAudioGraph();
+      try { mediaStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
+      mediaStreamRef.current = null;
     }
   };
   
@@ -312,6 +587,22 @@ const BookDetailsPage = () => {
   };
   
   // Download functionality removed per request
+
+  useEffect(() => {
+    return () => {
+      try { if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop(); } catch {}
+      try { mediaStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      silenceTimerRef.current = null;
+      try { analyserRef.current?.disconnect(); } catch {}
+      try { sourceRef.current?.disconnect(); } catch {}
+      analyserRef.current = null;
+      sourceRef.current = null;
+      try { audioContextRef.current && audioContextRef.current.state !== 'closed' && audioContextRef.current.close(); } catch {}
+      audioContextRef.current = null;
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -569,51 +860,71 @@ const BookDetailsPage = () => {
             </div>
             
             {/* Chat Interface - takes 2/5 width on large screens, wider than before */}
-            <div className="lg:col-span-2">
-              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/30 h-[85vh] flex flex-col">
-                {/* Chat header */}
-                <div className="relative p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-blue-600 to-purple-600 rounded-t-3xl overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
-                  <div className="relative z-10">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
-                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <h2 className="text-xl font-bold text-white">AI Book Assistant</h2>
-                        <p className="text-white/90 text-sm">Ask questions or hover over text to highlight</p>
-                      </div>
-                      {/* RAG Status Indicator */}
-                      <div className="flex items-center space-x-2">
-                        {ragStatus === 'loading' && (
-                          <div className="flex items-center space-x-2 bg-white/20 rounded-full px-3 py-1">
-                            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                            <span className="text-white/90 text-xs">Checking...</span>
-                          </div>
-                        )}
-                        {ragStatus === 'embedding' && (
-                          <div className="flex items-center space-x-2 bg-white/20 rounded-full px-3 py-1">
-                            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce"></div>
-                            <span className="text-white/90 text-xs">Preparing...</span>
-                          </div>
-                        )}
-                        {ragStatus === 'ready' && (
-                          <div className="flex items-center space-x-2 bg-white/20 rounded-full px-3 py-1">
-                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                            <span className="text-white/90 text-xs">Ready</span>
-                          </div>
-                        )}
-                        {ragStatus === 'error' && (
-                          <div className="flex items-center space-x-2 bg-white/20 rounded-full px-3 py-1">
-                            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                            <span className="text-white/90 text-xs">Error</span>
-                          </div>
-                        )}
-                       </div>
-                      </div>
+            <div className="lg:col-span-2 space-y-4">
+              {/* Conversation Mode Panel */}
+              <div className="relative rounded-2xl border-2 border-gray-200/70 dark:border-gray-700/50 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+                <div className="p-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Conversation Mode</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Hands‑free talk & listen. Speak to ask, answer plays back.</p>
+                  </div>
+                  <button
+                    onClick={conv.toggleConversationMode}
+                    className={`px-4 py-2 rounded-xl font-medium transition-all duration-300 ${conv.isConversationMode ? 'bg-red-600 text-white shadow-red-300 hover:bg-red-700 scale-[1.02]' : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl hover:scale-105'}`}
+                  >
+                    {conv.isConversationMode ? 'Stop' : 'Start'}
+                  </button>
+                </div>
+                <div className="px-4 pb-4">
+                  <div className={`h-24 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center px-4 ${conv.isConversationMode ? 'animate-pulse' : ''}`}>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Live transcript</p>
+                      <p className="mt-1 text-gray-900 dark:text-white line-clamp-2 min-h-[1.5rem]">{conv.currentTranscript || (conv.isConversationMode ? 'Listening...' : 'Tap Start to begin')}</p>
+                    </div>
+                    <div className="ml-4">
+                      {conv.isPlayingResponse ? (
+                        <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-blue-600/10 text-blue-700 dark:text-blue-300">Playing</span>
+                      ) : (
+                        <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-gray-600/10 text-gray-700 dark:text-gray-300">Idle</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-3 h-28 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                    <ConversationVisualizer audioLevel={conv.audioLevel as any} status={conv.status as any} />
+                  </div>
+                </div>
+              </div>
+              {/* Chat header */}
+              <div className="rounded-2xl border-2 border-gray-200/70 dark:border-gray-700/50 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+                <div className="p-4 border-b border-gray-200/70 dark:border-gray-700/50">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">AI Book Chat</h2>
+                    <div className="flex items-center space-x-2">
+                      {ragStatus === 'loading' && (
+                        <div className="flex items-center space-x-2 bg-white/20 rounded-full px-3 py-1">
+                          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                          <span className="text-white/90 text-xs">Checking...</span>
+                        </div>
+                      )}
+                      {ragStatus === 'embedding' && (
+                        <div className="flex items-center space-x-2 bg-white/20 rounded-full px-3 py-1">
+                          <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce"></div>
+                          <span className="text-white/90 text-xs">Preparing...</span>
+                        </div>
+                      )}
+                      {ragStatus === 'ready' && (
+                        <div className="flex items-center space-x-2 bg-white/20 rounded-full px-3 py-1">
+                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                          <span className="text-white/90 text-xs">Ready</span>
+                        </div>
+                      )}
+                      {ragStatus === 'error' && (
+                        <div className="flex items-center space-x-2 bg-white/20 rounded-full px-3 py-1">
+                          <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                          <span className="text-white/90 text-xs">Error</span>
+                        </div>
+                      )}
+                     </div>
                     </div>
                   </div>
                 </div>
@@ -656,7 +967,7 @@ const BookDetailsPage = () => {
                 {/* Chat messages */}
                 <div 
                   ref={chatContainerRef}
-                  className="flex-1 overflow-y-auto p-4 space-y-4"
+                  className="flex-1 overflow-y-auto p-4 space-y-4 bg-white dark:bg-gray-800"
                 >
                   {chatHistory.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center p-6">
@@ -752,10 +1063,33 @@ const BookDetailsPage = () => {
                               ? "AI chat unavailable" 
                               : "Checking book status..."
                       }
-                      className="w-full p-4 pr-14 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-800/90 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 backdrop-blur-sm"
+                      className="w-full p-4 pr-28 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-800/90 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 backdrop-blur-sm"
                     />
+                    {/* Mic button */}
                     <button
-                      onClick={handleSendMessage}
+                      onClick={isRecording ? stopRecording : startRecording}
+                      className={`absolute right-14 top-1/2 transform -translate-y-1/2 p-3 rounded-xl transition-all duration-300 ${
+                        isRecording
+                          ? 'bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 animate-pulse'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                      title={isRecording ? 'Stop recording' : 'Click to record'}
+                    >
+                      {isRecording ? (
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="6" width="12" height="12" rx="2" />
+                        </svg>
+                      ) : (
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 14a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v3a4 4 0 0 0 4 4z" />
+                          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                          <line x1="12" y1="19" x2="12" y2="23" />
+                          <line x1="8" y1="23" x2="16" y2="23" />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleSendMessage()}
                       disabled={isSending || !chatMessage.trim() || ragStatus !== 'ready'}
                       className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-3 rounded-xl transition-all duration-300 ${
                           isSending || !chatMessage.trim() || ragStatus !== 'ready'
@@ -770,7 +1104,6 @@ const BookDetailsPage = () => {
                   </div>
                 </div>
               </div>
-            </div>
           </motion.div>
         </motion.div>
       </div>

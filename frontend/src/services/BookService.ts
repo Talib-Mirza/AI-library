@@ -1,4 +1,4 @@
-import axios, { AxiosProgressEvent } from 'axios';
+import axios from 'axios';
 import { getAuthToken } from '../utils/auth';
 import api from '../utils/axiosConfig';
 
@@ -48,12 +48,6 @@ class BookService {
       isProcessed: bookData.is_processed !== undefined ? bookData.is_processed : bookData.isProcessed,
       processingError: bookData.processing_error || bookData.processingError,
       fileSize: bookData.file_size || bookData.fileSize,
-      // Normalize tags to array of strings
-      tags: Array.isArray(bookData.tags)
-        ? bookData.tags
-        : (typeof bookData.tags === 'string' && bookData.tags.length
-            ? bookData.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t.length)
-            : (bookData.tags || [])),
     };
   }
 
@@ -228,17 +222,10 @@ class BookService {
   // Create a new book with file upload
   async createBook(formData: FormData) {
     try {
-      // Let Axios/browser set multipart boundaries; also log progress for debugging
+      // Use the configured api instance which already handles auth headers
       const response = await api.post('/books/', formData, {
-        onUploadProgress: (progressEvent: AxiosProgressEvent) => {
-          const total = progressEvent.total || 0;
-          const loaded = progressEvent.loaded || 0;
-          if (total > 0) {
-            const percent = Math.round((loaded * 100) / total);
-            console.log(`[BookService] Upload progress: ${percent}% (${loaded}/${total})`);
-          } else {
-            console.log(`[BookService] Upload progress: ${loaded} bytes`);
-          }
+        headers: {
+          'Content-Type': 'multipart/form-data',
         },
       });
       
@@ -260,9 +247,8 @@ class BookService {
       });
       
       return mappedBook;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating book:', error);
-      // Re-throw to allow caller to handle quota-specific errors
       throw error;
     }
   }
@@ -298,7 +284,7 @@ class BookService {
   }
 
   // Increment TTS minutes for the current user
-  static async incrementTTSMinutes(minutes: number) {
+  async incrementTTSMinutes(minutes: number) {
     try {
       // POST to /auth/increment-tts-minutes or similar endpoint
       const response = await api.post('/auth/increment-tts-minutes', { minutes });
@@ -310,6 +296,4 @@ class BookService {
   }
 }
 
-// Export both the class and a default instance
-export { BookService };
 export default new BookService();
