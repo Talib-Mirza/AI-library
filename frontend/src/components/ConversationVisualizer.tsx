@@ -200,7 +200,7 @@ export default function ConversationVisualizer({ audioLevel, status }: Props) {
     const mat = mesh.material as THREE.MeshStandardMaterial;
     if (status === 'listening' || status === 'finalizing') {
       const e = 0.2 + Math.min(0.8, audioLevel) * 0.6;
-      gsap.to(mat.emissiveIntensity, { duration: 0.1, value: e });
+      gsap.to(mat, { duration: 0.1, emissiveIntensity: e });
     }
   }, [audioLevel, status]);
 
