@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    ADMIN_SECRET_KEY: str = "your-super-secret-admin-key"  # Change this in production!
+    ADMIN_SECRET_KEY: str  # Must be set in .env - no default for security
     INIT_ADMIN_EMAIL: Optional[str] = None
     INIT_ADMIN_PASSWORD: Optional[str] = None
     

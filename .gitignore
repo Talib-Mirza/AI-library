@@ -343,6 +343,17 @@ coverage.xml
 !.env.example
 secrets.json
 .secrets/
+gcp-key.json
+*-key.json
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+service-account*.json
+google-credentials*.json
+aws-credentials*.json
+*.credentials
 
 # Temporary files
 *.tmp
